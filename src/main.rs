@@ -121,9 +121,10 @@ fn handle_event(
                 && let Ok(mut enigo) = Enigo::new(&Settings::default())
             {
                 std::thread::sleep(std::time::Duration::from_millis(50));
-                let _ = enigo.key(Key::Meta, Direction::Press);
+                let modifier = platform::paste_modifier();
+                let _ = enigo.key(modifier, Direction::Press);
                 let _ = enigo.key(Key::Unicode('v'), Direction::Click);
-                let _ = enigo.key(Key::Meta, Direction::Release);
+                let _ = enigo.key(modifier, Direction::Release);
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);

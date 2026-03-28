@@ -1,5 +1,5 @@
 use enigo::Key;
 
 pub fn paste_modifier() -> Key {
-    Key::Meta
+    Key::Control
 }
