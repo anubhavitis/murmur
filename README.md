@@ -61,9 +61,14 @@ Models are downloaded from [HuggingFace](https://huggingface.co/ggerganov/whispe
 
 ### Requirements
 
-- Rust (edition 2024)
-- cmake — `brew install cmake`
-- macOS permissions: **Input Monitoring** + **Microphone**
+| Requirement | macOS | Windows |
+|---|---|---|
+| Rust | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` | [rustup.rs](https://rustup.rs) |
+| cmake | `brew install cmake` | `winget install Kitware.CMake` |
+| C compiler | Included with Xcode CLT | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
+| Permissions | Input Monitoring + Microphone | — |
+
+> whisper.cpp is compiled from source automatically during `cargo build`. No manual installation needed.
 
 ### Build & run
 
