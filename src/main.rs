@@ -37,6 +37,8 @@ fn main() {
         }
     };
 
+    let download_proxy = proxy.clone();
+
     let hotkey_pressed = Arc::new(AtomicBool::new(false));
     hotkey::spawn_listener(proxy, state.config.hotkey.clone(), hotkey_pressed);
 
@@ -57,6 +59,7 @@ fn main() {
                 &mut audio,
                 &transcriber,
                 &mut clipboard,
+                &download_proxy,
                 control_flow,
             );
         }
@@ -69,6 +72,7 @@ fn main() {
                 &mut audio,
                 &transcriber,
                 &mut clipboard,
+                &download_proxy,
                 control_flow,
             );
         }
@@ -82,6 +86,7 @@ fn handle_event(
     audio: &mut AudioCapture,
     transcriber: &Transcriber,
     clipboard: &mut Clipboard,
+    download_proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
     control_flow: &mut ControlFlow,
 ) {
     match event {
@@ -91,11 +96,11 @@ fn handle_event(
             }
             match audio.start() {
                 Ok(()) => {
-                    eprintln!("[murmur] recording started");
+                    eprintln!("[murmur] recording...");
                     state.recording_state = RecordingState::Recording;
                     tray.rebuild(state);
                 }
-                Err(e) => eprintln!("[murmur] failed to start recording: {e}"),
+                Err(e) => eprintln!("[murmur] error: failed to start recording: {e}"),
             }
         }
         AppEvent::HotkeyReleased => {
@@ -103,49 +108,55 @@ fn handle_event(
                 return;
             }
             let samples = audio.stop();
-            let duration_secs = samples.len() as f32 / 16_000.0;
-            eprintln!(
-                "[murmur] recording stopped: {} samples ({:.1}s), transcribing...",
-                samples.len(),
-                duration_secs
-            );
+            eprintln!("[murmur] transcribing...");
             state.recording_state = RecordingState::Transcribing;
             tray.rebuild(state);
             transcriber.transcribe(samples);
         }
         AppEvent::TranscriptionComplete(text) => {
-            eprintln!("[murmur] transcription: {text}");
+            eprintln!("[murmur] \"{text}\"");
             if let Err(e) = clipboard.set_text(&text) {
-                eprintln!("[murmur] clipboard error: {e}");
-            } else {
-                eprintln!("[murmur] copied to clipboard");
-                if state.config.output_mode == OutputMode::PasteAtCursor
-                    && let Ok(mut enigo) = Enigo::new(&Settings::default())
-                {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                    let _ = enigo.key(Key::Meta, Direction::Press);
-                    let _ = enigo.key(Key::Unicode('v'), Direction::Click);
-                    let _ = enigo.key(Key::Meta, Direction::Release);
-                    eprintln!("[murmur] pasted at cursor");
-                }
+                eprintln!("[murmur] error: clipboard: {e}");
+            } else if state.config.output_mode == OutputMode::PasteAtCursor
+                && let Ok(mut enigo) = Enigo::new(&Settings::default())
+            {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = enigo.key(Key::Meta, Direction::Press);
+                let _ = enigo.key(Key::Unicode('v'), Direction::Click);
+                let _ = enigo.key(Key::Meta, Direction::Release);
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
         }
         AppEvent::TranscriptionError(err) => {
-            eprintln!("[murmur] transcription error: {err}");
+            eprintln!("[murmur] error: {err}");
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
         }
-        AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray),
+        AppEvent::ModelDownloadProgress(model, pct) => {
+            state.download_progress = Some((model, pct));
+            tray.rebuild(state);
+        }
+        AppEvent::ModelDownloadComplete(model) => {
+            state.download_progress = None;
+            state.refresh_models();
+            state.config.selected_model = model;
+            state.config.save();
+            tray.rebuild(state);
+        }
+        AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray, download_proxy),
         AppEvent::Quit => {
             *control_flow = ControlFlow::Exit;
         }
-        _ => {}
     }
 }
 
-fn handle_menu_command(cmd: MenuCommand, state: &mut AppState, tray: &mut Tray) {
+fn handle_menu_command(
+    cmd: MenuCommand,
+    state: &mut AppState,
+    tray: &mut Tray,
+    proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
+) {
     match cmd {
         MenuCommand::SetOutputMode(mode) => {
             state.config.output_mode = mode;
@@ -162,8 +173,11 @@ fn handle_menu_command(cmd: MenuCommand, state: &mut AppState, tray: &mut Tray) 
             state.config.save();
             tray.rebuild(state);
         }
-        MenuCommand::DownloadModel(_model) => {
-            // phase 5: model download via menu
+        MenuCommand::DownloadModel(model) => {
+            if state.download_progress.is_some() {
+                return;
+            }
+            downloader::spawn_download(proxy.clone(), model);
         }
         MenuCommand::Quit => {}
     }

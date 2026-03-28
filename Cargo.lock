@@ -1854,6 +1854,7 @@ dependencies = [
  "tao",
  "tray-icon",
  "whisper-rs",
+ "whisper-rs-sys",
 ]
 
 [[package]]

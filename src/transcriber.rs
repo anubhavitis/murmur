@@ -7,12 +7,20 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 use crate::app::AppEvent;
 use crate::downloader;
 
+fn suppress_whisper_logs() {
+    unsafe {
+        whisper_rs_sys::whisper_log_set(None, std::ptr::null_mut());
+    }
+}
+
 pub struct Transcriber {
     sender: mpsc::Sender<Vec<f32>>,
 }
 
 impl Transcriber {
     pub fn new(proxy: EventLoopProxy<AppEvent>, model: &str) -> Result<Self, String> {
+        suppress_whisper_logs();
+
         let model_path = downloader::ensure_model(model)?;
         let model_path_str = model_path
             .to_str()
