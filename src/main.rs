@@ -1,18 +1,22 @@
 mod app;
 mod audio;
 mod config;
+mod downloader;
 mod hotkey;
 mod platform;
+mod transcriber;
 mod tray;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use app::{AppEvent, AppState, MenuCommand, RecordingState};
+use arboard::Clipboard;
 use audio::AudioCapture;
 use config::Config;
 use tao::event::Event;
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
+use transcriber::Transcriber;
 use tray::Tray;
 use tray_icon::menu::MenuEvent;
 
@@ -24,11 +28,20 @@ fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
+    let transcriber = match Transcriber::new(proxy.clone(), &state.config.selected_model) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("[murmur] failed to init transcriber: {e}");
+            std::process::exit(1);
+        }
+    };
+
     let hotkey_pressed = Arc::new(AtomicBool::new(false));
     hotkey::spawn_listener(proxy, state.config.hotkey.clone(), hotkey_pressed);
 
     let menu_channel = MenuEvent::receiver();
     let mut tray = Tray::new(&state);
+    let mut clipboard = Clipboard::new().expect("failed to init clipboard");
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
@@ -36,11 +49,27 @@ fn main() {
         if let Ok(menu_event) = menu_channel.try_recv()
             && let Some(app_event) = tray.handle_menu_event(&menu_event, &state)
         {
-            handle_event(app_event, &mut state, &mut tray, &mut audio, control_flow);
+            handle_event(
+                app_event,
+                &mut state,
+                &mut tray,
+                &mut audio,
+                &transcriber,
+                &mut clipboard,
+                control_flow,
+            );
         }
 
         if let Event::UserEvent(app_event) = event {
-            handle_event(app_event, &mut state, &mut tray, &mut audio, control_flow);
+            handle_event(
+                app_event,
+                &mut state,
+                &mut tray,
+                &mut audio,
+                &transcriber,
+                &mut clipboard,
+                control_flow,
+            );
         }
     });
 }
@@ -50,6 +79,8 @@ fn handle_event(
     state: &mut AppState,
     tray: &mut Tray,
     audio: &mut AudioCapture,
+    transcriber: &Transcriber,
+    clipboard: &mut Clipboard,
     control_flow: &mut ControlFlow,
 ) {
     match event {
@@ -73,13 +104,28 @@ fn handle_event(
             let samples = audio.stop();
             let duration_secs = samples.len() as f32 / 16_000.0;
             eprintln!(
-                "[murmur] recording stopped: {} samples ({:.1}s)",
+                "[murmur] recording stopped: {} samples ({:.1}s), transcribing...",
                 samples.len(),
                 duration_secs
             );
+            state.recording_state = RecordingState::Transcribing;
+            tray.rebuild(state);
+            transcriber.transcribe(samples);
+        }
+        AppEvent::TranscriptionComplete(text) => {
+            eprintln!("[murmur] transcription: {text}");
+            if let Err(e) = clipboard.set_text(&text) {
+                eprintln!("[murmur] clipboard error: {e}");
+            } else {
+                eprintln!("[murmur] copied to clipboard");
+            }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
-            // phase 3: pass samples to transcriber
+        }
+        AppEvent::TranscriptionError(err) => {
+            eprintln!("[murmur] transcription error: {err}");
+            state.recording_state = RecordingState::Idle;
+            tray.rebuild(state);
         }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray),
         AppEvent::Quit => {
@@ -107,7 +153,7 @@ fn handle_menu_command(cmd: MenuCommand, state: &mut AppState, tray: &mut Tray) 
             tray.rebuild(state);
         }
         MenuCommand::DownloadModel(_model) => {
-            // phase 5: model download
+            // phase 5: model download via menu
         }
         MenuCommand::Quit => {}
     }
