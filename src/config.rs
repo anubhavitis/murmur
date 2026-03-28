@@ -26,7 +26,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            selected_model: "tiny".to_string(),
+            selected_model: "tiny.en".to_string(),
             output_mode: OutputMode::Clipboard,
             hotkey: HotkeyChoice::RightAlt,
         }

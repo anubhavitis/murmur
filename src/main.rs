@@ -147,8 +147,13 @@ fn handle_event(
             tray.rebuild(state);
         }
         AppEvent::ModelDownloadProgress(model, pct) => {
-            state.download_progress = Some((model, pct));
-            tray.rebuild(state);
+            let first = state.download_progress.is_none();
+            state.download_progress = Some((model.clone(), pct));
+            if first {
+                tray.rebuild(state);
+            } else {
+                tray.update_progress(&model, pct);
+            }
         }
         AppEvent::ModelDownloadComplete(model) => {
             state.download_progress = None;

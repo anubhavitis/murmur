@@ -6,7 +6,18 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode};
 
-const MODEL_REGISTRY: &[&str] = &["tiny", "base", "small", "medium", "large"];
+// (display_name, file_name, size)
+const MODEL_REGISTRY: &[(&str, &str, &str)] = &[
+    ("tiny (english)", "tiny.en", "74 MB"),
+    ("tiny (multilingual)", "tiny", "74 MB"),
+    ("base (english)", "base.en", "141 MB"),
+    ("base (multilingual)", "base", "141 MB"),
+    ("small (english)", "small.en", "465 MB"),
+    ("small (multilingual)", "small", "465 MB"),
+    ("medium (english)", "medium.en", "1.4 GB"),
+    ("medium (multilingual)", "medium", "1.4 GB"),
+    ("large (multilingual)", "large-v3", "2.9 GB"),
+];
 const FRAME_COUNT: usize = 36;
 const ICON_SIZE: u32 = 44;
 
@@ -18,6 +29,7 @@ struct MenuIds {
     hotkey_caps_lock: MenuId,
     current_model: MenuId,
     model_items: Vec<(String, MenuId)>,
+    progress_item: Option<MenuItem>,
     quit: MenuId,
 }
 
@@ -128,6 +140,12 @@ impl Tray {
         let _ = self.icon.set_icon(Some(self.static_icon.clone()));
     }
 
+    pub fn update_progress(&self, model: &str, pct: u8) {
+        if let Some(ref item) = self.ids.progress_item {
+            item.set_text(format!("Downloading: {model} ({pct}%)"));
+        }
+    }
+
     fn build_menu(state: &AppState) -> (Menu, MenuIds) {
         let menu = Menu::new();
 
@@ -175,25 +193,28 @@ impl Tray {
 
         let model_sub = Submenu::new("Change Model", true);
         let mut model_items = Vec::new();
-        for &model in MODEL_REGISTRY {
-            let installed = state.installed_models.contains(&model.to_string());
+        for &(display_name, file_name, size) in MODEL_REGISTRY {
+            let installed = state.installed_models.contains(&file_name.to_string());
             let label = if installed {
-                model.to_string()
+                format!("  {display_name}")
             } else {
-                format!("{model} (download)")
+                format!("⬇ {display_name}  ({size})")
             };
             let item = MenuItem::new(label, true, None);
-            model_items.push((model.to_string(), item.id().clone()));
+            model_items.push((file_name.to_string(), item.id().clone()));
             model_sub.append(&item).unwrap();
         }
         menu.append(&model_sub).unwrap();
 
-        if let Some((ref name, pct)) = state.download_progress {
+        let progress_item = if let Some((ref name, pct)) = state.download_progress {
             menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
                 .unwrap();
             let progress = MenuItem::new(format!("Downloading: {name} ({pct}%)"), false, None);
             menu.append(&progress).unwrap();
-        }
+            Some(progress)
+        } else {
+            None
+        };
 
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
@@ -209,6 +230,7 @@ impl Tray {
             hotkey_caps_lock: hotkey_caps_lock_id,
             current_model: current_model_id,
             model_items,
+            progress_item,
             quit: quit_id,
         };
         (menu, ids)
