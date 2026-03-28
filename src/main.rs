@@ -13,7 +13,8 @@ use std::sync::Arc;
 use app::{AppEvent, AppState, MenuCommand, RecordingState};
 use arboard::Clipboard;
 use audio::AudioCapture;
-use config::Config;
+use config::{Config, OutputMode};
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use tao::event::Event;
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use transcriber::Transcriber;
@@ -118,6 +119,15 @@ fn handle_event(
                 eprintln!("[murmur] clipboard error: {e}");
             } else {
                 eprintln!("[murmur] copied to clipboard");
+                if state.config.output_mode == OutputMode::PasteAtCursor
+                    && let Ok(mut enigo) = Enigo::new(&Settings::default())
+                {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    let _ = enigo.key(Key::Meta, Direction::Press);
+                    let _ = enigo.key(Key::Unicode('v'), Direction::Click);
+                    let _ = enigo.key(Key::Meta, Direction::Release);
+                    eprintln!("[murmur] pasted at cursor");
+                }
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
