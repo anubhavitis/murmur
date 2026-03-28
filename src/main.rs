@@ -1,8 +1,15 @@
 mod app;
+mod audio;
 mod config;
+mod hotkey;
+mod platform;
 mod tray;
 
-use app::{AppEvent, AppState, MenuCommand};
+use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
+
+use app::{AppEvent, AppState, MenuCommand, RecordingState};
+use audio::AudioCapture;
 use config::Config;
 use tao::event::Event;
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
@@ -12,9 +19,13 @@ use tray_icon::menu::MenuEvent;
 fn main() {
     let config = Config::load();
     let mut state = AppState::new(config);
+    let mut audio = AudioCapture::new();
 
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
-    let _proxy = event_loop.create_proxy();
+    let proxy = event_loop.create_proxy();
+
+    let hotkey_pressed = Arc::new(AtomicBool::new(false));
+    hotkey::spawn_listener(proxy, state.config.hotkey.clone(), hotkey_pressed);
 
     let menu_channel = MenuEvent::receiver();
     let mut tray = Tray::new(&state);
@@ -25,11 +36,11 @@ fn main() {
         if let Ok(menu_event) = menu_channel.try_recv()
             && let Some(app_event) = tray.handle_menu_event(&menu_event, &state)
         {
-            handle_event(app_event, &mut state, &mut tray, control_flow);
+            handle_event(app_event, &mut state, &mut tray, &mut audio, control_flow);
         }
 
         if let Event::UserEvent(app_event) = event {
-            handle_event(app_event, &mut state, &mut tray, control_flow);
+            handle_event(app_event, &mut state, &mut tray, &mut audio, control_flow);
         }
     });
 }
@@ -38,14 +49,43 @@ fn handle_event(
     event: AppEvent,
     state: &mut AppState,
     tray: &mut Tray,
+    audio: &mut AudioCapture,
     control_flow: &mut ControlFlow,
 ) {
     match event {
+        AppEvent::HotkeyPressed => {
+            if state.recording_state != RecordingState::Idle {
+                return;
+            }
+            match audio.start() {
+                Ok(()) => {
+                    eprintln!("[murmur] recording started");
+                    state.recording_state = RecordingState::Recording;
+                    tray.rebuild(state);
+                }
+                Err(e) => eprintln!("[murmur] failed to start recording: {e}"),
+            }
+        }
+        AppEvent::HotkeyReleased => {
+            if state.recording_state != RecordingState::Recording {
+                return;
+            }
+            let samples = audio.stop();
+            let duration_secs = samples.len() as f32 / 16_000.0;
+            eprintln!(
+                "[murmur] recording stopped: {} samples ({:.1}s)",
+                samples.len(),
+                duration_secs
+            );
+            state.recording_state = RecordingState::Idle;
+            tray.rebuild(state);
+            // phase 3: pass samples to transcriber
+        }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray),
         AppEvent::Quit => {
             *control_flow = ControlFlow::Exit;
         }
-        _ => {} // phases 2-5 will handle remaining events
+        _ => {}
     }
 }
 
