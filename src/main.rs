@@ -9,17 +9,20 @@ mod tray;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use app::{AppEvent, AppState, MenuCommand, RecordingState};
 use arboard::Clipboard;
 use audio::AudioCapture;
 use config::{Config, OutputMode};
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
-use tao::event::Event;
+use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
 use transcriber::Transcriber;
 use tray::Tray;
 use tray_icon::menu::MenuEvent;
+
+const ANIMATION_INTERVAL: Duration = Duration::from_millis(33);
 
 fn main() {
     let config = Config::load();
@@ -47,7 +50,11 @@ fn main() {
     let mut clipboard = Clipboard::new().expect("failed to init clipboard");
 
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Wait;
+        if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event {
+            if state.recording_state == RecordingState::Recording {
+                tray.advance_frame();
+            }
+        }
 
         if let Ok(menu_event) = menu_channel.try_recv()
             && let Some(app_event) = tray.handle_menu_event(&menu_event, &state)
@@ -60,7 +67,6 @@ fn main() {
                 &transcriber,
                 &mut clipboard,
                 &download_proxy,
-                control_flow,
             );
         }
 
@@ -73,9 +79,14 @@ fn main() {
                 &transcriber,
                 &mut clipboard,
                 &download_proxy,
-                control_flow,
             );
         }
+
+        *control_flow = if state.recording_state == RecordingState::Recording {
+            ControlFlow::WaitUntil(Instant::now() + ANIMATION_INTERVAL)
+        } else {
+            ControlFlow::Wait
+        };
     });
 }
 
@@ -87,7 +98,6 @@ fn handle_event(
     transcriber: &Transcriber,
     clipboard: &mut Clipboard,
     download_proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
-    control_flow: &mut ControlFlow,
 ) {
     match event {
         AppEvent::HotkeyPressed => {
@@ -110,6 +120,7 @@ fn handle_event(
             let samples = audio.stop();
             eprintln!("[murmur] transcribing...");
             state.recording_state = RecordingState::Transcribing;
+            tray.reset_icon();
             tray.rebuild(state);
             transcriber.transcribe(samples);
         }
@@ -132,6 +143,7 @@ fn handle_event(
         AppEvent::TranscriptionError(err) => {
             eprintln!("[murmur] error: {err}");
             state.recording_state = RecordingState::Idle;
+            tray.reset_icon();
             tray.rebuild(state);
         }
         AppEvent::ModelDownloadProgress(model, pct) => {
@@ -147,7 +159,7 @@ fn handle_event(
         }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray, download_proxy),
         AppEvent::Quit => {
-            *control_flow = ControlFlow::Exit;
+            std::process::exit(0);
         }
     }
 }

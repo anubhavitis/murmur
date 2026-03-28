@@ -1,3 +1,5 @@
+use image::imageops::FilterType;
+use image::RgbaImage;
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, Submenu};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
@@ -5,6 +7,8 @@ use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode};
 
 const MODEL_REGISTRY: &[&str] = &["tiny", "base", "small", "medium", "large"];
+const FRAME_COUNT: usize = 36;
+const ICON_SIZE: u32 = 44;
 
 struct MenuIds {
     status: MenuId,
@@ -18,40 +22,110 @@ struct MenuIds {
 }
 
 pub struct Tray {
-    _icon: TrayIcon,
+    icon: TrayIcon,
     ids: MenuIds,
+    static_icon: Icon,
+    frames: Vec<Icon>,
+    frame_index: usize,
 }
 
-fn build_icon() -> Icon {
-    // 16x16 RGBA — simple dark circle
-    let size = 16u32;
-    let mut rgba = Vec::with_capacity((size * size * 4) as usize);
-    let center = size as f32 / 2.0;
-    let radius = 6.0f32;
-    for y in 0..size {
-        for x in 0..size {
-            let dx = x as f32 - center;
-            let dy = y as f32 - center;
-            if dx * dx + dy * dy <= radius * radius {
-                rgba.extend_from_slice(&[40, 40, 40, 255]);
-            } else {
-                rgba.extend_from_slice(&[0, 0, 0, 0]);
+fn rotate_rgba(img: &RgbaImage, angle_rad: f32) -> RgbaImage {
+    let (w, h) = img.dimensions();
+    let mut out = RgbaImage::new(w, h);
+    let cx = w as f32 / 2.0;
+    let cy = h as f32 / 2.0;
+    let cos = angle_rad.cos();
+    let sin = angle_rad.sin();
+
+    for y in 0..h {
+        for x in 0..w {
+            let dx = x as f32 - cx;
+            let dy = y as f32 - cy;
+            let src_x = dx * cos + dy * sin + cx;
+            let src_y = -dx * sin + dy * cos + cy;
+
+            if src_x >= 0.0 && src_x < (w - 1) as f32 && src_y >= 0.0 && src_y < (h - 1) as f32 {
+                let x0 = src_x as u32;
+                let y0 = src_y as u32;
+                let fx = src_x - x0 as f32;
+                let fy = src_y - y0 as f32;
+
+                let p00 = img.get_pixel(x0, y0).0;
+                let p10 = img.get_pixel(x0 + 1, y0).0;
+                let p01 = img.get_pixel(x0, y0 + 1).0;
+                let p11 = img.get_pixel(x0 + 1, y0 + 1).0;
+
+                let mut rgba = [0u8; 4];
+                for c in 0..4 {
+                    let v = p00[c] as f32 * (1.0 - fx) * (1.0 - fy)
+                        + p10[c] as f32 * fx * (1.0 - fy)
+                        + p01[c] as f32 * (1.0 - fx) * fy
+                        + p11[c] as f32 * fx * fy;
+                    rgba[c] = v.round() as u8;
+                }
+                out.put_pixel(x, y, image::Rgba(rgba));
             }
         }
     }
-    Icon::from_rgba(rgba, size, size).expect("failed to create icon")
+    out
+}
+
+fn rgba_to_icon(img: &RgbaImage) -> Icon {
+    let (w, h) = img.dimensions();
+    Icon::from_rgba(img.as_raw().clone(), w, h).expect("failed to create icon")
+}
+
+fn build_static_icon() -> (Icon, RgbaImage) {
+    let png_bytes = include_bytes!("../assets/logo_light.png");
+    let large = image::load_from_memory(png_bytes)
+        .expect("failed to decode icon")
+        .into_rgba8();
+    let small = image::imageops::resize(&large, ICON_SIZE, ICON_SIZE, FilterType::Lanczos3);
+    let icon = rgba_to_icon(&small);
+    (icon, large)
+}
+
+fn generate_frames(large: &RgbaImage) -> Vec<Icon> {
+    let mut frames = Vec::with_capacity(FRAME_COUNT);
+    for i in 0..FRAME_COUNT {
+        let angle = (i as f32) * std::f32::consts::TAU / FRAME_COUNT as f32;
+        let rotated = rotate_rgba(large, angle);
+        let small = image::imageops::resize(&rotated, ICON_SIZE, ICON_SIZE, FilterType::Lanczos3);
+        frames.push(rgba_to_icon(&small));
+    }
+    frames
 }
 
 impl Tray {
     pub fn new(state: &AppState) -> Self {
+        let (static_icon, large) = build_static_icon();
+        let frames = generate_frames(&large);
+
         let (menu, ids) = Self::build_menu(state);
         let icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
             .with_tooltip("Murmur")
-            .with_icon(build_icon())
+            .with_icon(static_icon.clone())
             .build()
             .expect("failed to create tray icon");
-        Self { _icon: icon, ids }
+
+        Self {
+            icon,
+            ids,
+            static_icon,
+            frames,
+            frame_index: 0,
+        }
+    }
+
+    pub fn advance_frame(&mut self) {
+        self.frame_index = (self.frame_index + 1) % FRAME_COUNT;
+        let _ = self.icon.set_icon(Some(self.frames[self.frame_index].clone()));
+    }
+
+    pub fn reset_icon(&mut self) {
+        self.frame_index = 0;
+        let _ = self.icon.set_icon(Some(self.static_icon.clone()));
     }
 
     fn build_menu(state: &AppState) -> (Menu, MenuIds) {
@@ -68,7 +142,6 @@ impl Tray {
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 
-        // Output mode
         let output_sub = Submenu::new("Output Mode", true);
         let is_clipboard = state.config.output_mode == OutputMode::Clipboard;
         let output_clipboard = CheckMenuItem::new("Copy to Clipboard", true, is_clipboard, None);
@@ -79,7 +152,6 @@ impl Tray {
         output_sub.append(&output_paste).unwrap();
         menu.append(&output_sub).unwrap();
 
-        // Hotkey
         let hotkey_sub = Submenu::new("Hotkey", true);
         let is_right_alt = state.config.hotkey == HotkeyChoice::RightAlt;
         let hotkey_right_alt = CheckMenuItem::new("Right Option", true, is_right_alt, None);
@@ -93,7 +165,6 @@ impl Tray {
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 
-        // Current model
         let current_model = MenuItem::new(
             format!("Model: {}", state.config.selected_model),
             false,
@@ -102,7 +173,6 @@ impl Tray {
         let current_model_id = current_model.id().clone();
         menu.append(&current_model).unwrap();
 
-        // Model selection
         let model_sub = Submenu::new("Change Model", true);
         let mut model_items = Vec::new();
         for &model in MODEL_REGISTRY {
@@ -118,7 +188,6 @@ impl Tray {
         }
         menu.append(&model_sub).unwrap();
 
-        // Download progress
         if let Some((ref name, pct)) = state.download_progress {
             menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
                 .unwrap();
@@ -189,7 +258,7 @@ impl Tray {
 
     pub fn rebuild(&mut self, state: &AppState) {
         let (menu, ids) = Self::build_menu(state);
-        self._icon.set_menu(Some(Box::new(menu)));
+        self.icon.set_menu(Some(Box::new(menu)));
         self.ids = ids;
     }
 }
