@@ -17,7 +17,7 @@ pub trait TranscriptionBackend: Send {
     fn transcribe(&mut self, samples: &[f32], languages: &[String]) -> Result<String, String>;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BackendChoice {
     Whisper(String),
     #[cfg(feature = "fluid_audio")]
@@ -43,7 +43,6 @@ pub fn resolve_backend(tier: &Tier, languages: &[String]) -> BackendChoice {
     }
 }
 
-
 fn suppress_whisper_logs() {
     unsafe {
         whisper_rs_sys::whisper_log_set(None, std::ptr::null_mut());
@@ -61,43 +60,17 @@ pub struct Transcriber {
 }
 
 impl Transcriber {
-    pub fn new(proxy: EventLoopProxy<AppEvent>, model: &str) -> Self {
+    pub fn new(proxy: EventLoopProxy<AppEvent>, choice: BackendChoice) -> Self {
         suppress_whisper_logs();
 
-        let is_english_model = model.ends_with(".en");
-        let model_name = model.to_string();
         let (sender, receiver) = mpsc::channel::<TranscribeRequest>();
         let thread_proxy = proxy.clone();
 
         thread::spawn(move || {
-            let model_path = match downloader::ensure_model(&model_name) {
-                Ok(p) => p,
-                Err(e) => {
-                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
-                        format!("model load failed: {e}"),
-                    ));
-                    return;
-                }
+            let mut backend: Box<dyn TranscriptionBackend> = match Self::create_backend(&choice, &thread_proxy) {
+                Some(b) => b,
+                None => return,
             };
-
-            let model_path_str = match model_path.to_str() {
-                Some(s) => s.to_string(),
-                None => {
-                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
-                        "invalid model path".to_string(),
-                    ));
-                    return;
-                }
-            };
-
-            let mut backend: Box<dyn TranscriptionBackend> =
-                match whisper_backend::WhisperBackend::new(&model_path_str, is_english_model) {
-                    Ok(b) => Box::new(b),
-                    Err(e) => {
-                        let _ = thread_proxy.send_event(AppEvent::TranscriptionError(e));
-                        return;
-                    }
-                };
 
             let _ = thread_proxy.send_event(AppEvent::TranscriberReady);
 
@@ -114,6 +87,61 @@ impl Transcriber {
         });
 
         Self { sender, proxy }
+    }
+
+    fn create_backend(
+        choice: &BackendChoice,
+        proxy: &EventLoopProxy<AppEvent>,
+    ) -> Option<Box<dyn TranscriptionBackend>> {
+        match choice {
+            BackendChoice::Whisper(model) => {
+                let is_english = model.ends_with(".en");
+                let model_path = match downloader::ensure_model(model) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = proxy.send_event(AppEvent::TranscriptionError(
+                            format!("model load failed: {e}"),
+                        ));
+                        return None;
+                    }
+                };
+
+                let path_str = match model_path.to_str() {
+                    Some(s) => s.to_string(),
+                    None => {
+                        let _ = proxy.send_event(AppEvent::TranscriptionError(
+                            "invalid model path".to_string(),
+                        ));
+                        return None;
+                    }
+                };
+
+                match whisper_backend::WhisperBackend::new(&path_str, is_english) {
+                    Ok(b) => Some(Box::new(b)),
+                    Err(e) => {
+                        let _ = proxy.send_event(AppEvent::TranscriptionError(e));
+                        None
+                    }
+                }
+            }
+            #[cfg(feature = "fluid_audio")]
+            BackendChoice::FluidAudio => {
+                match fluid_backend::FluidAudioBackend::new() {
+                    Ok(b) => {
+                        eprintln!("[murmur] FluidAudio (Parakeet) backend loaded");
+                        Some(Box::new(b))
+                    }
+                    Err(e) => {
+                        eprintln!("[murmur] FluidAudio failed: {e}, falling back to Whisper");
+                        // Fallback to Whisper small
+                        Self::create_backend(
+                            &BackendChoice::Whisper("small".to_string()),
+                            proxy,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     pub fn transcribe(&self, samples: Vec<f32>, languages: Vec<String>) {

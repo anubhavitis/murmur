@@ -72,6 +72,7 @@ pub fn prompt_input_monitoring() {
         .spawn();
 }
 
+#[cfg(feature = "fluid_audio")]
 pub fn is_apple_silicon() -> bool {
     std::env::consts::ARCH == "aarch64"
 }

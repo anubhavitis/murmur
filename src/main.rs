@@ -17,7 +17,7 @@ use config::{Config, OutputMode};
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use tao::event::{Event, StartCause};
 use tao::event_loop::{ControlFlow, EventLoopBuilder};
-use transcriber::Transcriber;
+use transcriber::{BackendChoice, Transcriber, resolve_backend};
 use tray::Tray;
 use tray_icon::menu::MenuEvent;
 
@@ -82,7 +82,8 @@ fn main() {
     let proxy = event_loop.create_proxy();
 
     // Always bootstrap with tiny.en for instant startup
-    let mut transcriber = Transcriber::new(proxy.clone(), BOOTSTRAP_MODEL);
+    let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
+    let mut transcriber = Transcriber::new(proxy.clone(), bootstrap);
 
     let download_proxy = proxy.clone();
 
@@ -224,14 +225,29 @@ fn handle_event(
             tray.rebuild(state);
 
             // Check if we need to upgrade from bootstrap model
-            let target = state.config.selected_tier.whisper_model();
-            if target != BOOTSTRAP_MODEL && !state.upgrading_backend {
-                if downloader::model_path(target).exists() {
-                    let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
-                } else {
-                    eprintln!("[murmur] background download: {target}");
-                    state.upgrading_backend = true;
-                    downloader::spawn_upgrade(download_proxy.clone(), target.to_string());
+            let target = resolve_backend(
+                &state.config.selected_tier,
+                &state.config.languages,
+            );
+            let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
+            if target != bootstrap && !state.upgrading_backend {
+                match &target {
+                    BackendChoice::Whisper(model) => {
+                        if downloader::model_path(model).exists() {
+                            let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+                        } else {
+                            eprintln!("[murmur] background download: {model}");
+                            state.upgrading_backend = true;
+                            downloader::spawn_upgrade(
+                                download_proxy.clone(),
+                                model.clone(),
+                            );
+                        }
+                    }
+                    #[cfg(feature = "fluid_audio")]
+                    BackendChoice::FluidAudio => {
+                        let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+                    }
                 }
             }
         }
@@ -258,8 +274,11 @@ fn handle_event(
             tray.rebuild(state);
         }
         AppEvent::BackendUpgradeReady => {
-            let target = state.config.selected_tier.whisper_model();
-            eprintln!("[murmur] upgrading to {target}");
+            let target = resolve_backend(
+                &state.config.selected_tier,
+                &state.config.languages,
+            );
+            eprintln!("[murmur] upgrading backend to {target:?}");
             state.transcriber_ready = false;
             state.upgrading_backend = false;
             state.download_progress = None;
