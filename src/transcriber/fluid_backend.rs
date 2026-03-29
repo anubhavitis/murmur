@@ -40,7 +40,7 @@ impl TranscriptionBackend for FluidAudioBackend {
 }
 
 fn write_wav_temp(samples: &[f32]) -> Result<std::path::PathBuf, std::io::Error> {
-    let path = std::env::temp_dir().join("murmur_fluid_tmp.wav");
+    let path = std::env::temp_dir().join(format!("murmur_fluid_{}.wav", std::process::id()));
     let mut f = std::fs::File::create(&path)?;
 
     let sample_rate: u32 = 16000;

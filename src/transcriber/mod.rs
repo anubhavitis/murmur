@@ -59,8 +59,6 @@ pub struct Transcriber {
 
 impl Transcriber {
     pub fn new(proxy: EventLoopProxy<AppEvent>, choice: BackendChoice) -> Self {
-        suppress_whisper_logs();
-
         let (sender, receiver) = mpsc::channel::<TranscribeRequest>();
         let thread_proxy = proxy.clone();
 
@@ -94,6 +92,7 @@ impl Transcriber {
     ) -> Option<Box<dyn TranscriptionBackend>> {
         match choice {
             BackendChoice::Whisper(model) => {
+                suppress_whisper_logs();
                 let is_english = model.ends_with(".en");
                 let model_path = match downloader::ensure_model(model) {
                     Ok(p) => p,

@@ -18,6 +18,7 @@ pub enum AppEvent {
     ModelDownloadProgress(String, u8),
     ModelDownloadComplete(String),
     BackendUpgradeReady,
+    BackendUpgradeFailed(String),
     Menu(MenuCommand),
     Quit,
 }
@@ -44,6 +45,8 @@ pub struct AppState {
     pub download_progress: Option<(String, u8)>,
     pub pending_restart: bool,
     pub upgrading_backend: bool,
+    pub backend_upgraded: bool,
+    pub pending_upgrade_swap: bool,
     pub permissions: Permissions,
     pub transcriber_ready: bool,
 }
@@ -56,6 +59,8 @@ impl AppState {
             download_progress: None,
             pending_restart: false,
             upgrading_backend: false,
+            backend_upgraded: false,
+            pending_upgrade_swap: false,
             permissions: Permissions::default(),
             transcriber_ready: false,
         }

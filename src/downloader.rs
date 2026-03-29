@@ -45,6 +45,10 @@ pub fn spawn_download(proxy: EventLoopProxy<AppEvent>, model: String) {
 pub fn spawn_upgrade(proxy: EventLoopProxy<AppEvent>, model: String) {
     thread::spawn(move || {
         let path = model_path(&model);
+        if path.exists() {
+            let _ = proxy.send_event(AppEvent::BackendUpgradeReady);
+            return;
+        }
         let _ = proxy.send_event(AppEvent::ModelDownloadProgress(model.clone(), 0));
 
         match download_model_streaming(&model, &path, &proxy) {
@@ -53,6 +57,9 @@ pub fn spawn_upgrade(proxy: EventLoopProxy<AppEvent>, model: String) {
             }
             Err(e) => {
                 eprintln!("[murmur] background upgrade failed: {e}");
+                let _ = proxy.send_event(AppEvent::BackendUpgradeFailed(format!(
+                    "upgrade download failed: {e}"
+                )));
             }
         }
     });

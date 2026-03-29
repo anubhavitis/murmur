@@ -31,6 +31,11 @@ pub fn check_accessibility() -> bool {
 pub fn prompt_microphone() {}
 pub fn prompt_accessibility() {}
 pub fn prompt_input_monitoring() {}
+#[cfg(feature = "fluid_audio")]
+pub fn is_apple_silicon() -> bool {
+    false
+}
+
 pub fn self_restart() -> ! {
     let exe = std::env::current_exe().expect("failed to get current exe path");
     let _ = Command::new(exe).spawn();

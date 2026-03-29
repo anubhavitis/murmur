@@ -5,6 +5,7 @@ pub struct Language {
     pub name: &'static str,
 }
 
+#[cfg(feature = "fluid_audio")]
 pub const PARAKEET_LANGUAGES: &[&str] = &[
     "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt", "mt",
     "pl", "pt", "ro", "ru", "sk", "sl", "es", "sv", "uk",
@@ -12,7 +13,14 @@ pub const PARAKEET_LANGUAGES: &[&str] = &[
 
 pub fn is_supported_on_tier(code: &str, tier: &Tier) -> bool {
     match tier {
-        Tier::Fast => PARAKEET_LANGUAGES.contains(&code),
+        Tier::Fast => {
+            #[cfg(feature = "fluid_audio")]
+            if crate::platform::is_apple_silicon() {
+                return PARAKEET_LANGUAGES.contains(&code);
+            }
+            let _ = code;
+            true
+        }
         Tier::Standard | Tier::Accurate => true,
     }
 }

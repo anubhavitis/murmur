@@ -222,11 +222,20 @@ fn handle_event(
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
+            // HIGH 3: apply deferred upgrade now that we're idle
+            if state.pending_upgrade_swap {
+                let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+            }
         }
         AppEvent::TranscriberReady => {
             eprintln!("[murmur] model loaded, ready");
             state.transcriber_ready = true;
             tray.rebuild(state);
+
+            // CRITICAL: skip upgrade check if already upgraded
+            if state.backend_upgraded {
+                return;
+            }
 
             // Check if we need to upgrade from bootstrap model
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
@@ -254,6 +263,10 @@ fn handle_event(
             state.recording_state = RecordingState::Idle;
             tray.reset_icon();
             tray.rebuild(state);
+            // HIGH 3: apply deferred upgrade now that we're idle
+            if state.pending_upgrade_swap {
+                let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+            }
         }
         AppEvent::ModelDownloadProgress(model, pct) => {
             let first = state.download_progress.is_none();
@@ -272,13 +285,27 @@ fn handle_event(
             tray.rebuild(state);
         }
         AppEvent::BackendUpgradeReady => {
+            // HIGH 3: defer swap if recording is active
+            if state.recording_state != RecordingState::Idle {
+                eprintln!("[murmur] upgrade ready, deferring until idle");
+                state.pending_upgrade_swap = true;
+                return;
+            }
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             eprintln!("[murmur] upgrading backend to {target:?}");
             state.transcriber_ready = false;
             state.upgrading_backend = false;
+            state.backend_upgraded = true;
+            state.pending_upgrade_swap = false;
             state.download_progress = None;
             tray.rebuild(state);
             *transcriber = Transcriber::new(download_proxy.clone(), target);
+        }
+        AppEvent::BackendUpgradeFailed(err) => {
+            eprintln!("[murmur] backend upgrade failed: {err}");
+            state.upgrading_backend = false;
+            state.download_progress = None;
+            tray.rebuild(state);
         }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray, download_proxy),
         AppEvent::Quit => {
@@ -310,14 +337,22 @@ fn handle_menu_command(
             }
             state.config.selected_tier = tier;
             state.config.save();
-            let model = state.config.selected_tier.whisper_model();
-            if downloader::model_path(model).exists() {
-                platform::self_restart();
-            } else {
-                state.pending_restart = true;
-                state.download_progress = Some((model.to_string(), 0));
-                tray.rebuild(state);
-                downloader::spawn_download(proxy.clone(), model.to_string());
+            let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
+            match target {
+                BackendChoice::Whisper(ref model) => {
+                    if downloader::model_path(model).exists() {
+                        platform::self_restart();
+                    } else {
+                        state.pending_restart = true;
+                        state.download_progress = Some((model.to_string(), 0));
+                        tray.rebuild(state);
+                        downloader::spawn_download(proxy.clone(), model.to_string());
+                    }
+                }
+                #[cfg(feature = "fluid_audio")]
+                BackendChoice::FluidAudio => {
+                    platform::self_restart();
+                }
             }
         }
         MenuCommand::ToggleLanguage(code) => {
