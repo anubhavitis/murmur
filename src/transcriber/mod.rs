@@ -122,20 +122,31 @@ impl Transcriber {
                 }
             }
             #[cfg(feature = "fluid_audio")]
-            BackendChoice::FluidAudio => match fluid_backend::FluidAudioBackend::new() {
-                Ok(b) => {
-                    eprintln!("[murmur] FluidAudio (Parakeet) backend loaded");
-                    Some(Box::new(b))
+            BackendChoice::FluidAudio => {
+                let result = std::panic::catch_unwind(fluid_backend::FluidAudioBackend::new);
+                match result {
+                    Ok(Ok(b)) => {
+                        eprintln!("[murmur] FluidAudio (Parakeet) backend loaded");
+                        Some(Box::new(b))
+                    }
+                    Ok(Err(e)) => {
+                        eprintln!("[murmur] FluidAudio failed: {e}, falling back to Whisper");
+                        Self::create_backend(
+                            &BackendChoice::Whisper("small".to_string()),
+                            proxy,
+                            on_fail,
+                        )
+                    }
+                    Err(_) => {
+                        eprintln!("[murmur] FluidAudio panicked, falling back to Whisper");
+                        Self::create_backend(
+                            &BackendChoice::Whisper("small".to_string()),
+                            proxy,
+                            on_fail,
+                        )
+                    }
                 }
-                Err(e) => {
-                    eprintln!("[murmur] FluidAudio failed: {e}, falling back to Whisper");
-                    Self::create_backend(
-                        &BackendChoice::Whisper("small".to_string()),
-                        proxy,
-                        on_fail,
-                    )
-                }
-            },
+            }
         }
     }
 

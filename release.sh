@@ -20,8 +20,13 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
     fi
 fi
 
-echo "Building murmur v${VERSION} (release)..."
-cargo build --release
+if ! command -v swift &>/dev/null; then
+    echo "Error: Swift not found. Install Xcode Command Line Tools."
+    exit 1
+fi
+
+echo "Building murmur v${VERSION} (release, with FluidAudio)..."
+cargo build --release --features fluid_audio
 
 echo "Stripping binary..."
 strip "$BINARY" 2>/dev/null || echo "Warning: strip not available, skipping"
