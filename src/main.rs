@@ -238,12 +238,16 @@ fn handle_event(
 
             // CRITICAL: skip upgrade check if already upgraded
             if state.backend_upgraded {
+                platform::notify("Murmur", "Ready to use");
                 return;
             }
 
             // Check if we need to upgrade from bootstrap model
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
+            if target == bootstrap || state.upgrading_backend {
+                platform::notify("Murmur", "Ready to use");
+            }
             if target != bootstrap && !state.upgrading_backend {
                 match &target {
                     BackendChoice::Whisper(model) => {
