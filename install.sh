@@ -12,78 +12,97 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Installing Murmur..."
+info() { echo "  -> $1"; }
+ok()   { echo "  ✓  $1"; }
+err()  { echo "  ✗  $1"; }
+
+echo ""
+echo "  Murmur Installer"
+echo "  ─────────────────"
+echo ""
 
 # Don't run as root
 if [ "$(id -u)" -eq 0 ]; then
-    echo "Error: Do not run this script with sudo. It installs to your home directory."
+    err "Do not run this script with sudo. It installs to your home directory."
     exit 1
 fi
 
 # Check architecture
 ARCH=$(uname -m)
 if [ "$ARCH" != "arm64" ]; then
-    echo "Error: Murmur currently supports Apple Silicon (arm64) only."
-    echo "Your architecture: $ARCH"
+    err "Murmur currently supports Apple Silicon (arm64) only."
+    err "Your architecture: $ARCH"
     exit 1
 fi
+ok "Architecture: arm64"
 
 # Check macOS
 if [ "$(uname -s)" != "Darwin" ]; then
-    echo "Error: Murmur currently supports macOS only."
+    err "Murmur currently supports macOS only."
     exit 1
 fi
+ok "Platform: macOS $(sw_vers -productVersion 2>/dev/null || echo 'unknown')"
+
+echo ""
 
 # Get latest version
-echo "Fetching latest version..."
+info "Fetching latest release..."
 RELEASE_JSON=$(curl -sSf "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null) || {
-    echo "Error: Could not fetch latest version."
-    echo "GitHub API may be rate-limited. Try again in a few minutes, or download manually:"
-    echo "  https://github.com/${REPO}/releases/latest"
+    err "Could not fetch latest version."
+    err "GitHub API may be rate-limited. Try again in a few minutes, or download manually:"
+    err "  https://github.com/${REPO}/releases/latest"
     exit 1
 }
 VERSION=$(echo "$RELEASE_JSON" | grep '"tag_name"' | sed 's/.*"v\(.*\)".*/\1/')
 if [ -z "$VERSION" ]; then
-    echo "Error: Could not parse version from GitHub release."
+    err "Could not parse version from GitHub release."
     exit 1
 fi
-echo "Latest version: v${VERSION}"
+ok "Latest version: v${VERSION}"
 
 # Download
 ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.tar.gz"
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
 TMP_DIR=$(mktemp -d)
 
-echo "Downloading..."
+info "Downloading binary..."
 curl -sSfL "$URL" -o "${TMP_DIR}/${ARCHIVE}" || {
-    echo "Error: Download failed. Check if release v${VERSION} exists:"
-    echo "  https://github.com/${REPO}/releases"
+    err "Download failed. Check if release v${VERSION} exists:"
+    err "  https://github.com/${REPO}/releases"
     exit 1
 }
+ok "Downloaded ${ARCHIVE}"
 
-echo "Extracting..."
+info "Extracting..."
 tar -xzf "${TMP_DIR}/${ARCHIVE}" -C "$TMP_DIR"
 
 MURMUR_BIN=$(find "$TMP_DIR" -name murmur -type f | head -1)
 if [ -z "$MURMUR_BIN" ]; then
-    echo "Error: Binary not found in archive."
+    err "Binary not found in archive."
     exit 1
 fi
+ok "Extracted binary"
+
+echo ""
 
 # Stop existing instance BEFORE replacing binary
 if launchctl list 2>/dev/null | grep -q "com.murmur.app"; then
-    echo "Stopping existing Murmur instance..."
+    info "Stopping existing Murmur instance..."
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
     sleep 1
+    ok "Stopped previous instance"
 fi
 
 # Install binary
+info "Installing to ${INSTALL_DIR}/murmur"
 mkdir -p "$INSTALL_DIR"
 mv "$MURMUR_BIN" "${INSTALL_DIR}/murmur"
 chmod +x "${INSTALL_DIR}/murmur"
 xattr -cr "${INSTALL_DIR}/murmur" 2>/dev/null || true
+ok "Binary installed"
 
 # Install Launch Agent
+info "Setting up Launch Agent (auto-start on login)..."
 cat > "$PLIST_PATH" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -111,23 +130,29 @@ cat > "$PLIST_PATH" <<EOF
 </dict>
 </plist>
 EOF
+ok "Launch Agent installed at ${PLIST_PATH}"
 
-# Load Launch Agent
+info "Starting Murmur..."
 launchctl load "$PLIST_PATH"
+ok "Murmur is running"
 
 echo ""
-echo "=== Murmur v${VERSION} installed ==="
+echo "  ✓  Murmur v${VERSION} installed successfully"
 echo ""
-echo "Murmur is now running in your menubar."
+echo "  ┌─────────────────────────────────────────────────────┐"
+echo "  │  Murmur will automatically ask for permissions:     │"
+echo "  │                                                     │"
+echo "  │  1. Microphone        — click Allow when prompted   │"
+echo "  │  2. Accessibility     — toggle on in Settings       │"
+echo "  │  3. Input Monitoring  — toggle on in Settings       │"
+echo "  │                                                     │"
+echo "  │  Settings panes open automatically. Just toggle on. │"
+echo "  └─────────────────────────────────────────────────────┘"
 echo ""
-echo "IMPORTANT: Grant these permissions in System Settings > Privacy & Security:"
-echo "  1. Input Monitoring  — for hotkey detection"
-echo "  2. Microphone        — for audio capture"
-echo "  3. Accessibility     — for paste-at-cursor"
+echo "  Config:  ~/.murmur/config.json"
+echo "  Models:  ~/.murmur/models/"
+echo "  Logs:    ~/.murmur/murmur.log"
 echo ""
-echo "Look for 'murmur' in each permission list and toggle it on."
-echo "You may need to restart Murmur after granting permissions."
+echo "  Uninstall:"
+echo "    curl -sSL https://raw.githubusercontent.com/${REPO}/main/uninstall.sh | sh"
 echo ""
-echo "To uninstall:"
-echo "  curl -sSL https://raw.githubusercontent.com/${REPO}/main/uninstall.sh | sh"
-echo "  Or download and run: ./uninstall.sh"
