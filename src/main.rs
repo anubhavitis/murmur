@@ -3,6 +3,7 @@ mod audio;
 mod config;
 mod downloader;
 mod hotkey;
+mod languages;
 mod platform;
 mod transcriber;
 mod tray;
@@ -50,10 +51,10 @@ fn main() {
     let mut clipboard = Clipboard::new().expect("failed to init clipboard");
 
     event_loop.run(move |event, _, control_flow| {
-        if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event {
-            if state.recording_state == RecordingState::Recording {
-                tray.advance_frame();
-            }
+        if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event
+            && state.recording_state == RecordingState::Recording
+        {
+            tray.advance_frame();
         }
 
         if let Ok(menu_event) = menu_channel.try_recv()
@@ -122,7 +123,7 @@ fn handle_event(
             state.recording_state = RecordingState::Transcribing;
             tray.reset_icon();
             tray.rebuild(state);
-            transcriber.transcribe(samples);
+            transcriber.transcribe(samples, state.config.languages.clone());
         }
         AppEvent::TranscriptionComplete(text) => {
             eprintln!("[murmur] \"{text}\"");
@@ -197,6 +198,17 @@ fn handle_menu_command(
             }
             downloader::spawn_download(proxy.clone(), model);
         }
-        MenuCommand::Quit => {}
+        MenuCommand::ToggleLanguage(code) => {
+            if code == "en" {
+                return;
+            }
+            if let Some(pos) = state.config.languages.iter().position(|l| l == &code) {
+                state.config.languages.remove(pos);
+            } else {
+                state.config.languages.push(code);
+            }
+            state.config.save();
+            tray.rebuild(state);
+        }
     }
 }

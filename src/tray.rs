@@ -5,6 +5,7 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode};
+use crate::languages::LANGUAGES;
 
 // (display_name, file_name, size)
 const MODEL_REGISTRY: &[(&str, &str, &str)] = &[
@@ -22,13 +23,12 @@ const FRAME_COUNT: usize = 36;
 const ICON_SIZE: u32 = 44;
 
 struct MenuIds {
-    status: MenuId,
     output_clipboard: MenuId,
     output_paste: MenuId,
     hotkey_right_alt: MenuId,
     hotkey_caps_lock: MenuId,
-    current_model: MenuId,
     model_items: Vec<(String, MenuId)>,
+    language_items: Vec<(String, MenuId)>,
     progress_item: Option<MenuItem>,
     quit: MenuId,
 }
@@ -155,7 +155,6 @@ impl Tray {
             RecordingState::Transcribing => "Status: Transcribing...",
         };
         let status = MenuItem::new(status_text, false, None);
-        let status_id = status.id().clone();
         menu.append(&status).unwrap();
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
@@ -180,6 +179,37 @@ impl Tray {
         hotkey_sub.append(&hotkey_caps_lock).unwrap();
         menu.append(&hotkey_sub).unwrap();
 
+        // Languages
+        let lang_sub = Submenu::new("Languages", true);
+        let mut language_items = Vec::new();
+
+        // Selected languages (toggleable)
+        for lang in LANGUAGES {
+            let selected = state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
+            if !selected {
+                continue;
+            }
+            let enabled = lang.code != "en";
+            let item = CheckMenuItem::new(lang.name, enabled, true, None);
+            language_items.push((lang.code.to_string(), item.id().clone()));
+            lang_sub.append(&item).unwrap();
+        }
+
+        lang_sub.append(&tray_icon::menu::PredefinedMenuItem::separator()).unwrap();
+        let add_sub = Submenu::new("Add language...", true);
+
+        for lang in LANGUAGES {
+            let selected = state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
+            if selected {
+                continue;
+            }
+            let item = CheckMenuItem::new(lang.name, true, false, None);
+            language_items.push((lang.code.to_string(), item.id().clone()));
+            add_sub.append(&item).unwrap();
+        }
+        lang_sub.append(&add_sub).unwrap();
+        menu.append(&lang_sub).unwrap();
+
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 
@@ -188,7 +218,6 @@ impl Tray {
             false,
             None,
         );
-        let current_model_id = current_model.id().clone();
         menu.append(&current_model).unwrap();
 
         let model_sub = Submenu::new("Change Model", true);
@@ -223,13 +252,12 @@ impl Tray {
         menu.append(&quit).unwrap();
 
         let ids = MenuIds {
-            status: status_id,
             output_clipboard: output_clipboard_id,
             output_paste: output_paste_id,
             hotkey_right_alt: hotkey_right_alt_id,
             hotkey_caps_lock: hotkey_caps_lock_id,
-            current_model: current_model_id,
             model_items,
+            language_items,
             progress_item,
             quit: quit_id,
         };
@@ -272,6 +300,14 @@ impl Tray {
                         model_name.clone(),
                     )));
                 }
+            }
+        }
+
+        for (lang_code, menu_id) in &self.ids.language_items {
+            if id == menu_id {
+                return Some(AppEvent::Menu(MenuCommand::ToggleLanguage(
+                    lang_code.clone(),
+                )));
             }
         }
 

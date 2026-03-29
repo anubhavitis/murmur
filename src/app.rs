@@ -6,7 +6,7 @@ pub enum MenuCommand {
     DownloadModel(String),
     SetOutputMode(OutputMode),
     SetHotkey(HotkeyChoice),
-    Quit,
+    ToggleLanguage(String),
 }
 
 #[derive(Debug, Clone)]

@@ -16,11 +16,17 @@ pub enum HotkeyChoice {
     CapsLock,
 }
 
+fn default_languages() -> Vec<String> {
+    vec!["en".to_string()]
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     pub selected_model: String,
     pub output_mode: OutputMode,
     pub hotkey: HotkeyChoice,
+    #[serde(default = "default_languages")]
+    pub languages: Vec<String>,
 }
 
 impl Default for Config {
@@ -29,6 +35,7 @@ impl Default for Config {
             selected_model: "tiny.en".to_string(),
             output_mode: OutputMode::Clipboard,
             hotkey: HotkeyChoice::RightAlt,
+            languages: default_languages(),
         }
     }
 }
