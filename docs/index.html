@@ -60,6 +60,12 @@
                 <img src="logo_light.png" alt="Murmur" class="h-6 w-6">
                 <span class="font-semibold text-sm">Murmur</span>
             </div>
+            <div class="flex items-center gap-5">
+                <a href="#install" class="text-neutral-400 hover:text-white transition-colors text-sm hidden md:block">Install</a>
+                <a href="#upgrade" class="text-neutral-400 hover:text-white transition-colors text-sm hidden md:block">Upgrade</a>
+                <a href="#features" class="text-neutral-400 hover:text-white transition-colors text-sm hidden md:block">Features</a>
+                <a href="#permissions" class="text-neutral-400 hover:text-white transition-colors text-sm hidden md:block">Permissions</a>
+                <a href="#tiers" class="text-neutral-400 hover:text-white transition-colors text-sm hidden md:block">Tiers</a>
             <a href="https://github.com/anubhavitis/murmur" target="_blank"
                 class="text-neutral-400 hover:text-white transition-colors">
                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -67,6 +73,7 @@
                         d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
                 </svg>
             </a>
+            </div>
         </div>
     </nav>
 
@@ -78,13 +85,13 @@
                 <img src="logo_light.png" alt="Murmur" class="relative h-16 w-16 md:h-20 md:w-20 mx-auto">
             </div>
             <h1 class="text-4xl md:text-6xl font-bold tracking-tight mb-4">Murmur</h1>
-            <p class="text-lg md:text-2xl text-neutral-400 mb-3">Local speech-to-text from your menubar.</p>
-            <p class="text-neutral-500 max-w-lg mx-auto">Hold a hotkey. Speak. Release. Fully offline.</p>
+            <p class="text-lg md:text-2xl text-neutral-400 mb-3">Voice to text in milliseconds.</p>
+            <p class="text-neutral-500 max-w-lg mx-auto">No cloud. No API keys. Hold a hotkey. Speak. Release.</p>
         </div>
     </section>
 
     <!-- Install -->
-    <section id="install" class="py-12 md:py-20 px-6 fade-in">
+    <section id="install" class="py-12 md:py-20 px-6 fade-in scroll-mt-16">
         <div class="max-w-4xl mx-auto">
             <h2 class="text-3xl font-semibold text-center mb-4">Install</h2>
             <p class="text-center text-neutral-500 text-sm mb-10">Currently available for macOS (Apple Silicon). Windows
@@ -98,9 +105,8 @@
                             class="bg-amber-500/10 text-amber-500 text-xs font-medium px-2.5 py-0.5 rounded-full">Recommended</span>
                     </div>
                     <div class="relative bg-[#1a1a1a] border border-neutral-800 rounded-lg p-4 pr-10">
-                        <pre class="font-mono text-xs md:text-sm text-neutral-300 overflow-x-auto"><code>brew tap anubhavitis/murmur
-brew install --cask murmur</code></pre>
-                        <button onclick="copyText('brew tap anubhavitis/murmur\nbrew install --cask murmur', this)"
+                        <pre class="font-mono text-xs md:text-sm text-neutral-300 overflow-x-auto"><code>brew tap anubhavitis/murmur && brew install --cask murmur</code></pre>
+                        <button onclick="copyText('brew tap anubhavitis/murmur && brew install --cask murmur', this)"
                             class="absolute top-3 right-3 text-neutral-500 hover:text-neutral-300 transition-colors p-1"
                             title="Copy">
                             <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -147,6 +153,74 @@ brew install --cask murmur</code></pre>
         </div>
     </section>
 
+    <!-- Upgrade -->
+    <section id="upgrade" class="py-12 md:py-20 px-6 fade-in scroll-mt-16">
+        <div class="max-w-4xl mx-auto">
+            <h2 class="text-3xl font-semibold text-center mb-4">Upgrade</h2>
+            <p class="text-center text-neutral-500 text-sm mb-10">Updating to a new version of Murmur.</p>
+            <div class="max-w-2xl mx-auto space-y-6">
+                <!-- Homebrew upgrade -->
+                <div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-neutral-400 text-sm">Homebrew</span>
+                    </div>
+                    <div class="relative bg-[#1a1a1a] border border-neutral-800 rounded-lg p-4 pr-10">
+                        <pre class="font-mono text-xs md:text-sm text-neutral-300 overflow-x-auto"><code>brew update && brew upgrade --cask murmur</code></pre>
+                        <button onclick="copyText('brew update && brew upgrade --cask murmur', this)"
+                            class="absolute top-3 right-3 text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+                            title="Copy">
+                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Script reinstall -->
+                <div>
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-neutral-400 text-sm">Script</span>
+                    </div>
+                    <div class="relative bg-[#1a1a1a] border border-neutral-800 rounded-lg p-4 pr-10">
+                        <pre class="font-mono text-xs md:text-sm text-neutral-300 overflow-x-auto"><code>curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/install.sh | sh</code></pre>
+                        <button
+                            onclick="copyText('curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/install.sh | sh', this)"
+                            class="absolute top-3 right-3 text-neutral-500 hover:text-neutral-300 transition-colors p-1"
+                            title="Copy">
+                            <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                            <svg class="w-4 h-4 check-icon hidden" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <!-- Permissions warning -->
+                <div class="bg-amber-500/5 border border-amber-500/20 rounded-xl p-5">
+                    <h3 class="font-semibold text-amber-500 text-sm mb-2">Re-grant permissions after upgrade</h3>
+                    <p class="text-neutral-400 text-sm mb-3">Since Murmur is not notarized, macOS ties permissions to the binary's code signature. When the binary changes after an upgrade, your existing permissions become invalid.</p>
+                    <p class="text-neutral-400 text-sm mb-2">After upgrading, go to <strong class="text-neutral-200">System Settings &gt; Privacy &amp; Security</strong> and for each of the three permissions (Input Monitoring, Microphone, Accessibility):</p>
+                    <ol class="text-neutral-400 text-sm list-decimal list-inside space-y-1">
+                        <li>Remove <code class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-neutral-300">murmur</code> from the list</li>
+                        <li>Relaunch Murmur</li>
+                        <li>Re-grant the permission when prompted</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- How it works -->
     <section class="py-12 md:py-20 px-6 fade-in">
         <div class="max-w-4xl mx-auto">
@@ -177,7 +251,7 @@ brew install --cask murmur</code></pre>
     </section>
 
     <!-- Features -->
-    <section class="py-12 md:py-20 px-6 fade-in">
+    <section id="features" class="py-12 md:py-20 px-6 fade-in scroll-mt-16">
         <div class="max-w-4xl mx-auto">
             <h2 class="text-3xl font-semibold text-center mb-12">Features</h2>
             <div class="grid md:grid-cols-2 gap-5">
@@ -202,9 +276,8 @@ brew install --cask murmur</code></pre>
                 <div
                     class="bg-[#141414] border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition-colors">
                     <div class="text-xl mb-2">&#11015;</div>
-                    <h3 class="font-semibold mb-1">Auto-download models</h3>
-                    <p class="text-neutral-400 text-sm">Downloads tiny.en on first launch. Switch models from the menu.
-                    </p>
+                    <h3 class="font-semibold mb-1">Three tiers</h3>
+                    <p class="text-neutral-400 text-sm">Fast, Standard, Accurate. Pick your speed-vs-quality tradeoff from the menu.</p>
                 </div>
                 <div
                     class="bg-[#141414] border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition-colors">
@@ -215,9 +288,8 @@ brew install --cask murmur</code></pre>
                 <div
                     class="bg-[#141414] border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition-colors">
                     <div class="text-xl mb-2">&#127760;</div>
-                    <h3 class="font-semibold mb-1">100 languages</h3>
-                    <p class="text-neutral-400 text-sm">English and multilingual models. Auto-detect among preferred
-                        languages.</p>
+                    <h3 class="font-semibold mb-1">98+ languages</h3>
+                    <p class="text-neutral-400 text-sm">Multilingual transcription on Standard and Accurate tiers. 25 languages on Fast.</p>
                 </div>
                 <div
                     class="bg-[#141414] border border-neutral-800 rounded-xl p-5 hover:border-neutral-700 transition-colors">
@@ -236,7 +308,7 @@ brew install --cask murmur</code></pre>
     </section>
 
     <!-- Permissions -->
-    <section class="py-12 md:py-20 px-6 fade-in">
+    <section id="permissions" class="py-12 md:py-20 px-6 fade-in scroll-mt-16">
         <div class="max-w-4xl mx-auto">
             <h2 class="text-3xl font-semibold text-center mb-4">Permissions</h2>
             <p class="text-center text-neutral-400 mb-12">Grant these in <strong class="text-neutral-200">System
@@ -267,67 +339,44 @@ brew install --cask murmur</code></pre>
         </div>
     </section>
 
-    <!-- Models -->
-    <section class="py-12 md:py-20 px-6 fade-in">
+    <!-- Tiers -->
+    <section id="tiers" class="py-12 md:py-20 px-6 fade-in scroll-mt-16">
         <div class="max-w-4xl mx-auto">
-            <h2 class="text-3xl font-semibold text-center mb-12">Models</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm min-w-[400px]">
-                    <thead>
-                        <tr class="text-neutral-500 text-xs uppercase tracking-wider border-b border-neutral-800">
-                            <th class="text-left py-3 px-4 font-medium">Model</th>
-                            <th class="text-left py-3 px-4 font-medium">English</th>
-                            <th class="text-left py-3 px-4 font-medium">Multilingual</th>
-                            <th class="text-right py-3 px-4 font-medium">Size</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="border-b border-neutral-800/50 bg-[#141414]">
-                            <td class="py-3 px-4 font-medium">tiny</td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">tiny.en</code></td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">tiny</code></td>
-                            <td class="py-3 px-4 text-right text-neutral-400">74 MB</td>
-                        </tr>
-                        <tr class="border-b border-neutral-800/50">
-                            <td class="py-3 px-4 font-medium">base</td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">base.en</code></td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">base</code></td>
-                            <td class="py-3 px-4 text-right text-neutral-400">141 MB</td>
-                        </tr>
-                        <tr class="border-b border-neutral-800/50 bg-[#141414]">
-                            <td class="py-3 px-4 font-medium">small</td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">small.en</code></td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">small</code></td>
-                            <td class="py-3 px-4 text-right text-neutral-400">465 MB</td>
-                        </tr>
-                        <tr class="border-b border-neutral-800/50">
-                            <td class="py-3 px-4 font-medium">medium</td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">medium.en</code></td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">medium</code></td>
-                            <td class="py-3 px-4 text-right text-neutral-400">1.4 GB</td>
-                        </tr>
-                        <tr>
-                            <td class="py-3 px-4 font-medium">large</td>
-                            <td class="py-3 px-4 text-neutral-500">&mdash;</td>
-                            <td class="py-3 px-4 text-neutral-400"><code
-                                    class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-xs">large-v3</code></td>
-                            <td class="py-3 px-4 text-right text-neutral-400">2.9 GB</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <h2 class="text-3xl font-semibold text-center mb-4">Tiers</h2>
+            <p class="text-center text-neutral-500 text-sm mb-12">Pick a tier from the menubar. Models download automatically.</p>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-[#141414] border border-neutral-800 rounded-xl p-6 hover:border-neutral-700 transition-colors">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-lg font-semibold">Fast</h3>
+                        <span class="bg-amber-500/10 text-amber-500 text-xs font-medium px-2.5 py-0.5 rounded-full">Default</span>
+                    </div>
+                    <p class="text-neutral-400 text-sm mb-4">Lowest latency. Uses FluidAudio (Parakeet) on Apple Silicon, Whisper small as fallback.</p>
+                    <div class="space-y-2 text-xs text-neutral-500">
+                        <div class="flex justify-between"><span>Download</span><span class="text-neutral-300">465 MB</span></div>
+                        <div class="flex justify-between"><span>Languages</span><span class="text-neutral-300">25</span></div>
+                        <div class="flex justify-between"><span>Engine</span><span class="text-neutral-300">FluidAudio / Whisper</span></div>
+                    </div>
+                </div>
+                <div class="bg-[#141414] border border-neutral-800 rounded-xl p-6 hover:border-neutral-700 transition-colors">
+                    <h3 class="text-lg font-semibold mb-3">Standard</h3>
+                    <p class="text-neutral-400 text-sm mb-4">Balanced speed and accuracy. Uses Whisper medium model.</p>
+                    <div class="space-y-2 text-xs text-neutral-500">
+                        <div class="flex justify-between"><span>Download</span><span class="text-neutral-300">1.4 GB</span></div>
+                        <div class="flex justify-between"><span>Languages</span><span class="text-neutral-300">98+</span></div>
+                        <div class="flex justify-between"><span>Engine</span><span class="text-neutral-300">Whisper</span></div>
+                    </div>
+                </div>
+                <div class="bg-[#141414] border border-neutral-800 rounded-xl p-6 hover:border-neutral-700 transition-colors">
+                    <h3 class="text-lg font-semibold mb-3">Accurate</h3>
+                    <p class="text-neutral-400 text-sm mb-4">Best quality. Uses Whisper large-v3 model. Needs more RAM.</p>
+                    <div class="space-y-2 text-xs text-neutral-500">
+                        <div class="flex justify-between"><span>Download</span><span class="text-neutral-300">2.9 GB</span></div>
+                        <div class="flex justify-between"><span>Languages</span><span class="text-neutral-300">98+</span></div>
+                        <div class="flex justify-between"><span>Engine</span><span class="text-neutral-300">Whisper</span></div>
+                    </div>
+                </div>
             </div>
-            <p class="text-center text-neutral-500 text-sm mt-6">Models are downloaded from <a
-                    href="https://huggingface.co/ggerganov/whisper.cpp"
-                    class="text-amber-500 hover:text-amber-400 transition-colors" target="_blank">HuggingFace</a> and
-                stored at <code class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-neutral-300">~/.murmur/models/</code></p>
+            <p class="text-center text-neutral-500 text-sm mt-8">Models are stored at <code class="bg-[#1a1a1a] px-1.5 py-0.5 rounded text-neutral-300">~/.murmur/models/</code>. Switching tiers downloads the model in the background with zero downtime.</p>
         </div>
     </section>
 
