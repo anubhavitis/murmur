@@ -1,1 +1,3 @@
 /target
+*.tar.gz
+dist/murmur.rb
