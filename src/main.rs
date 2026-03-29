@@ -52,7 +52,6 @@ fn check_permissions(state: &mut AppState) -> bool {
         }
     }
 
-    // Prompt sequentially: mic first, then accessibility
     if !state.permissions.microphone && !state.permissions.prompted_mic {
         platform::prompt_microphone();
         state.permissions.prompted_mic = true;
@@ -78,7 +77,6 @@ fn main() {
     eprintln!("[murmur] starting...");
 
     let mut config = Config::load();
-    // Clean up unsupported languages for the current tier
     config
         .languages
         .retain(|l| languages::is_supported_on_tier(l, &config.selected_tier));
@@ -92,9 +90,14 @@ fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
-    // Always bootstrap with tiny.en for instant startup
     let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
-    let mut transcriber = Transcriber::new(proxy.clone(), bootstrap);
+    let mut transcriber = Transcriber::new(
+        proxy.clone(),
+        bootstrap,
+        AppEvent::TranscriberReady,
+        AppEvent::TranscriptionError,
+    );
+    let mut pending_transcriber: Option<Transcriber> = None;
 
     let download_proxy = proxy.clone();
 
@@ -132,6 +135,7 @@ fn main() {
                 &mut tray,
                 &mut audio,
                 &mut transcriber,
+                &mut pending_transcriber,
                 &mut clipboard,
                 &download_proxy,
             );
@@ -144,6 +148,7 @@ fn main() {
                 &mut tray,
                 &mut audio,
                 &mut transcriber,
+                &mut pending_transcriber,
                 &mut clipboard,
                 &download_proxy,
             );
@@ -158,12 +163,35 @@ fn main() {
     });
 }
 
+fn perform_upgrade_swap(
+    transcriber: &mut Transcriber,
+    pending: &mut Option<Transcriber>,
+    state: &mut AppState,
+    tray: &mut Tray,
+) {
+    if let Some(new) = pending.take() {
+        *transcriber = new;
+        state.pending_upgrade_swap = false;
+        tray.rebuild(state);
+        platform::notify(
+            "Murmur",
+            &format!(
+                "Upgraded to {} quality",
+                state.config.selected_tier.display_name()
+            ),
+        );
+        eprintln!("[murmur] backend upgrade complete");
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn handle_event(
     event: AppEvent,
     state: &mut AppState,
     tray: &mut Tray,
     audio: &mut AudioCapture,
     transcriber: &mut Transcriber,
+    pending_transcriber: &mut Option<Transcriber>,
     clipboard: &mut Clipboard,
     download_proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
 ) {
@@ -234,54 +262,55 @@ fn handle_event(
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
-            // HIGH 3: apply deferred upgrade now that we're idle
-            if state.pending_upgrade_swap {
-                let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+            if state.pending_upgrade_swap && pending_transcriber.is_some() {
+                perform_upgrade_swap(transcriber, pending_transcriber, state, tray);
             }
         }
         AppEvent::TranscriberReady => {
-            eprintln!("[murmur] model loaded, ready");
+            eprintln!("[murmur] bootstrap model loaded, ready");
             state.transcriber_ready = true;
             tray.rebuild(state);
-
-            // CRITICAL: skip upgrade check if already upgraded
-            if state.backend_upgraded {
-                platform::notify("Murmur", "Ready to use");
-                return;
-            }
+            platform::notify("Murmur", "Ready to use");
 
             // Check if we need to upgrade from bootstrap model
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
             if target == bootstrap || state.upgrading_backend {
-                platform::notify("Murmur", "Ready to use");
+                return;
             }
-            if target != bootstrap && !state.upgrading_backend {
-                match &target {
-                    BackendChoice::Whisper(model) => {
-                        if downloader::model_path(model).exists() {
-                            let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
-                        } else {
-                            eprintln!("[murmur] background download: {model}");
-                            state.upgrading_backend = true;
-                            downloader::spawn_upgrade(download_proxy.clone(), model.clone());
-                        }
-                    }
-                    #[cfg(feature = "fluid_audio")]
-                    BackendChoice::FluidAudio => {
+
+            match &target {
+                BackendChoice::Whisper(model) => {
+                    if downloader::model_path(model).exists() {
                         let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+                    } else {
+                        eprintln!("[murmur] background download: {model}");
+                        state.upgrading_backend = true;
+                        downloader::spawn_upgrade(download_proxy.clone(), model.clone());
                     }
                 }
+                #[cfg(feature = "fluid_audio")]
+                BackendChoice::FluidAudio => {
+                    let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+                }
             }
+        }
+        AppEvent::UpgradeTranscriberReady => {
+            eprintln!("[murmur] upgrade backend loaded");
+            if state.recording_state != RecordingState::Idle {
+                eprintln!("[murmur] deferring swap until idle");
+                state.pending_upgrade_swap = true;
+                return;
+            }
+            perform_upgrade_swap(transcriber, pending_transcriber, state, tray);
         }
         AppEvent::TranscriptionError(err) => {
             eprintln!("[murmur] error: {err}");
             state.recording_state = RecordingState::Idle;
             tray.reset_icon();
             tray.rebuild(state);
-            // HIGH 3: apply deferred upgrade now that we're idle
-            if state.pending_upgrade_swap {
-                let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+            if state.pending_upgrade_swap && pending_transcriber.is_some() {
+                perform_upgrade_swap(transcriber, pending_transcriber, state, tray);
             }
         }
         AppEvent::ModelDownloadProgress(model, pct) => {
@@ -301,26 +330,28 @@ fn handle_event(
             tray.rebuild(state);
         }
         AppEvent::BackendUpgradeReady => {
-            // HIGH 3: defer swap if recording is active
-            if state.recording_state != RecordingState::Idle {
-                eprintln!("[murmur] upgrade ready, deferring until idle");
-                state.pending_upgrade_swap = true;
+            if pending_transcriber.is_some() {
                 return;
             }
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
-            eprintln!("[murmur] upgrading backend to {target:?}");
-            state.transcriber_ready = false;
+            eprintln!("[murmur] loading upgrade backend: {target:?}");
             state.upgrading_backend = false;
-            state.backend_upgraded = true;
-            state.pending_upgrade_swap = false;
             state.download_progress = None;
+
+            // Create pending transcriber — active transcriber stays working
+            *pending_transcriber = Some(Transcriber::new(
+                download_proxy.clone(),
+                target,
+                AppEvent::UpgradeTranscriberReady,
+                AppEvent::BackendUpgradeFailed,
+            ));
             tray.rebuild(state);
-            *transcriber = Transcriber::new(download_proxy.clone(), target);
         }
         AppEvent::BackendUpgradeFailed(err) => {
             eprintln!("[murmur] backend upgrade failed: {err}");
             state.upgrading_backend = false;
             state.download_progress = None;
+            *pending_transcriber = None;
             tray.rebuild(state);
         }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray, download_proxy),
@@ -353,7 +384,6 @@ fn handle_menu_command(
             }
             state.config.selected_tier = tier;
 
-            // Auto-remove unsupported languages and notify
             let removed: Vec<String> = state
                 .config
                 .languages
