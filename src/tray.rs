@@ -201,7 +201,7 @@ impl Tray {
             let is_selected = state.config.selected_tier == *tier;
             let model = tier.whisper_model();
             let ready = downloader::model_path(model).exists();
-            let label = if ready || is_selected {
+            let label = if ready {
                 tier.display_name().to_string()
             } else {
                 format!(
@@ -210,7 +210,8 @@ impl Tray {
                     tier.download_size()
                 )
             };
-            let item = CheckMenuItem::new(&label, true, is_selected, None);
+            let checked = is_selected && ready;
+            let item = CheckMenuItem::new(&label, true, checked, None);
             tier_ids[i] = Some(item.id().clone());
             tier_sub.append(&item).unwrap();
         }
