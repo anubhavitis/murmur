@@ -143,7 +143,15 @@ impl Config {
 
     pub fn save(&self) {
         let path = Self::config_path();
-        let data = serde_json::to_string_pretty(self).expect("failed to serialize config");
-        fs::write(path, data).expect("failed to write config");
+        match serde_json::to_string_pretty(self) {
+            Ok(data) => {
+                if let Err(e) = fs::write(path, data) {
+                    eprintln!("[murmur] warning: failed to write config: {e}");
+                }
+            }
+            Err(e) => {
+                eprintln!("[murmur] warning: failed to serialize config: {e}");
+            }
+        }
     }
 }

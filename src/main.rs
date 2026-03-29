@@ -379,6 +379,9 @@ fn handle_menu_command(
             platform::self_restart();
         }
         MenuCommand::SetTier(tier) => {
+            if state.recording_state != RecordingState::Idle {
+                return;
+            }
             if state.download_progress.is_some() {
                 return;
             }

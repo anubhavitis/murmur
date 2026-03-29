@@ -7,6 +7,7 @@ use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode, Tier};
 use crate::downloader;
 use crate::languages::{LANGUAGES, is_supported_on_tier};
+use crate::transcriber::{BackendChoice, resolve_backend};
 
 const FRAME_COUNT: usize = 36;
 const ICON_SIZE: u32 = 44;
@@ -199,8 +200,12 @@ impl Tray {
         let mut tier_ids = [None, None, None];
         for (i, tier) in tiers.iter().enumerate() {
             let is_selected = state.config.selected_tier == *tier;
-            let model = tier.whisper_model();
-            let ready = downloader::model_path(model).exists();
+            let backend = resolve_backend(tier, &state.config.languages);
+            let ready = match &backend {
+                BackendChoice::Whisper(model) => downloader::model_path(model).exists(),
+                #[cfg(feature = "fluid_audio")]
+                BackendChoice::FluidAudio => true,
+            };
             let label = if ready {
                 tier.display_name().to_string()
             } else {
@@ -291,8 +296,6 @@ impl Tray {
             .unwrap();
 
         let progress_item = if let Some((ref model_name, pct)) = state.download_progress {
-            menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
-                .unwrap();
             let tier_label = Tier::label_for_model(model_name);
             let label = format!("Preparing {tier_label} quality... ({pct}%)");
             let progress = MenuItem::new(label, false, None);

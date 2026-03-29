@@ -26,9 +26,9 @@ impl TranscriptionBackend for FluidAudioBackend {
         let result = self
             .audio
             .transcribe_file(&path_str)
-            .map_err(|e| format!("FluidAudio transcription failed: {e}"))?;
-
+            .map_err(|e| format!("FluidAudio transcription failed: {e}"));
         let _ = std::fs::remove_file(&tmp);
+        let result = result?;
 
         let text = result.text.trim().to_string();
         if text.is_empty() {
