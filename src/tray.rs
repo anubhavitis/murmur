@@ -204,7 +204,11 @@ impl Tray {
             let label = if ready || is_selected {
                 tier.display_name().to_string()
             } else {
-                format!("\u{2B07} {}", tier.display_name())
+                format!(
+                    "\u{2B07} {} ({})",
+                    tier.display_name(),
+                    tier.download_size()
+                )
             };
             let item = CheckMenuItem::new(&label, true, is_selected, None);
             tier_ids[i] = Some(item.id().clone());

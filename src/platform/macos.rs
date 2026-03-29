@@ -77,6 +77,15 @@ pub fn is_apple_silicon() -> bool {
     std::env::consts::ARCH == "aarch64"
 }
 
+pub fn notify(title: &str, message: &str) {
+    let script = format!(
+        "display notification \"{}\" with title \"{}\"",
+        message.replace('"', "\\\""),
+        title.replace('"', "\\\""),
+    );
+    let _ = Command::new("osascript").args(["-e", &script]).spawn();
+}
+
 pub fn self_restart() -> ! {
     use std::os::unix::process::CommandExt;
     let exe = std::env::current_exe().expect("failed to get current exe path");

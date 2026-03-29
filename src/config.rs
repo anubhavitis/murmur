@@ -41,6 +41,14 @@ impl Tier {
         }
     }
 
+    pub fn download_size(&self) -> &str {
+        match self {
+            Tier::Fast => "465 MB",
+            Tier::Standard => "1.4 GB",
+            Tier::Accurate => "2.9 GB",
+        }
+    }
+
     pub fn label_for_model(model: &str) -> &'static str {
         match model {
             "small.en" | "small" => "Fast",

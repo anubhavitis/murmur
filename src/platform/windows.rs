@@ -31,6 +31,10 @@ pub fn check_accessibility() -> bool {
 pub fn prompt_microphone() {}
 pub fn prompt_accessibility() {}
 pub fn prompt_input_monitoring() {}
+
+pub fn notify(_title: &str, _message: &str) {
+    // TODO: Windows toast notification
+}
 #[cfg(feature = "fluid_audio")]
 pub fn is_apple_silicon() -> bool {
     false

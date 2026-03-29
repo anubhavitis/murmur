@@ -199,7 +199,11 @@ fn handle_event(
             eprintln!("[murmur] transcribing...");
             state.recording_state = RecordingState::Transcribing;
             tray.rebuild(state);
-            transcriber.transcribe(samples, state.config.languages.clone());
+            let langs = languages::effective_languages(
+                &state.config.languages,
+                &state.config.selected_tier,
+            );
+            transcriber.transcribe(samples, langs);
         }
         AppEvent::TranscriptionComplete(text) => {
             eprintln!("[murmur] \"{text}\"");
@@ -336,6 +340,33 @@ fn handle_menu_command(
                 return;
             }
             state.config.selected_tier = tier;
+
+            // Auto-remove unsupported languages and notify
+            let removed: Vec<String> = state
+                .config
+                .languages
+                .iter()
+                .filter(|l| !languages::is_supported_on_tier(l, &state.config.selected_tier))
+                .cloned()
+                .collect();
+            if !removed.is_empty() {
+                state
+                    .config
+                    .languages
+                    .retain(|l| languages::is_supported_on_tier(l, &state.config.selected_tier));
+                if state.config.languages.is_empty() {
+                    state.config.languages.push("en".to_string());
+                }
+                let names = removed.join(", ");
+                platform::notify(
+                    "Murmur",
+                    &format!(
+                        "{names} removed — not available on {} tier",
+                        state.config.selected_tier.display_name()
+                    ),
+                );
+            }
+
             state.config.save();
             let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             match target {
