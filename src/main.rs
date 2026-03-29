@@ -30,13 +30,37 @@ fn rotate_log() {
     let _ = std::fs::File::create(&log_path);
 }
 
+fn ensure_permissions() {
+    // Microphone: trigger prompt by briefly creating an input stream
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    if let Some(device) = host.default_input_device()
+        && let Ok(config) = device.default_input_config()
+    {
+        let _ = device.build_input_stream(
+            &config.into(),
+            |_data: &[f32], _: &cpal::InputCallbackInfo| {},
+            |_| {},
+            None,
+        );
+    }
+
+    // Accessibility: check and poll
+    if !platform::check_accessibility() {
+        platform::prompt_accessibility();
+        eprintln!("[murmur] waiting for accessibility permission...");
+        while !platform::check_accessibility() {
+            std::thread::sleep(Duration::from_secs(2));
+        }
+        eprintln!("[murmur] accessibility granted");
+    }
+}
+
 fn main() {
     rotate_log();
     eprintln!("[murmur] starting...");
-    eprintln!("[murmur] grant permissions in System Settings > Privacy & Security:");
-    eprintln!("[murmur]   - Input Monitoring (hotkey)");
-    eprintln!("[murmur]   - Microphone (audio capture)");
-    eprintln!("[murmur]   - Accessibility (paste at cursor)");
+
+    ensure_permissions();
 
     let config = Config::load();
     let mut state = AppState::new(config);

@@ -16,3 +16,15 @@ pub fn play_stop_sound() {
         .args(["-Command", "[System.Media.SystemSounds]::Asterisk.Play()"])
         .spawn();
 }
+
+pub fn check_accessibility() -> bool {
+    true
+}
+
+pub fn prompt_accessibility() {}
+pub fn prompt_input_monitoring() {}
+pub fn self_restart() -> ! {
+    let exe = std::env::current_exe().expect("failed to get current exe path");
+    let _ = Command::new(exe).spawn();
+    std::process::exit(0);
+}

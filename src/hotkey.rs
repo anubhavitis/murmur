@@ -51,8 +51,11 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
             }
         });
         if let Err(e) = result {
-            eprintln!("[murmur] error: hotkey listener failed: {e:?}");
-            eprintln!("[murmur] ensure Input Monitoring is granted in System Settings > Privacy & Security");
+            eprintln!("[murmur] hotkey listener failed: {e:?}");
+            crate::platform::prompt_input_monitoring();
+            eprintln!("[murmur] waiting for input monitoring permission...");
+            std::thread::sleep(std::time::Duration::from_secs(10));
+            crate::platform::self_restart();
         }
     });
 }
