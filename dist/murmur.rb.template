@@ -9,6 +9,10 @@ cask "murmur" do
 
   depends_on arch: :arm64
 
+  preflight do
+    system_command "/usr/bin/xattr", args: ["-cr", "#{staged_path}/Murmur.app"]
+  end
+
   app "Murmur.app"
 
   postflight do
