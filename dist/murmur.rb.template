@@ -10,6 +10,7 @@ cask "murmur" do
   depends_on arch: :arm64
 
   preflight do
+    system_command "/bin/launchctl", args: ["unload", "#{Dir.home}/Library/LaunchAgents/com.murmur.app.plist"]
     system_command "/usr/bin/xattr", args: ["-cr", "#{staged_path}/Murmur.app"]
   end
 
