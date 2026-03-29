@@ -8,8 +8,6 @@ mod platform;
 mod transcriber;
 mod tray;
 
-use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use app::{AppEvent, AppState, MenuCommand, RecordingState};
@@ -43,8 +41,7 @@ fn main() {
 
     let download_proxy = proxy.clone();
 
-    let hotkey_pressed = Arc::new(AtomicBool::new(false));
-    hotkey::spawn_listener(proxy, state.config.hotkey.clone(), hotkey_pressed);
+    hotkey::spawn_listener(proxy, state.config.hotkey.clone());
 
     let menu_channel = MenuEvent::receiver();
     let mut tray = Tray::new(&state);
@@ -52,7 +49,7 @@ fn main() {
 
     event_loop.run(move |event, _, control_flow| {
         if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event
-            && state.recording_state == RecordingState::Recording
+            && state.recording_state != RecordingState::Idle
         {
             tray.advance_frame();
         }
@@ -83,7 +80,7 @@ fn main() {
             );
         }
 
-        *control_flow = if state.recording_state == RecordingState::Recording {
+        *control_flow = if state.recording_state != RecordingState::Idle {
             ControlFlow::WaitUntil(Instant::now() + ANIMATION_INTERVAL)
         } else {
             ControlFlow::Wait
@@ -103,6 +100,7 @@ fn handle_event(
     match event {
         AppEvent::HotkeyPressed => {
             if state.recording_state != RecordingState::Idle {
+                eprintln!("[murmur] hotkey pressed but busy ({:?})", state.recording_state);
                 return;
             }
             match audio.start() {
@@ -112,7 +110,10 @@ fn handle_event(
                     state.recording_state = RecordingState::Recording;
                     tray.rebuild(state);
                 }
-                Err(e) => eprintln!("[murmur] error: failed to start recording: {e}"),
+                Err(e) => {
+                    platform::play_stop_sound();
+                    eprintln!("[murmur] error: failed to start recording: {e}");
+                }
             }
         }
         AppEvent::HotkeyReleased => {
@@ -123,7 +124,6 @@ fn handle_event(
             let samples = audio.stop();
             eprintln!("[murmur] transcribing...");
             state.recording_state = RecordingState::Transcribing;
-            tray.reset_icon();
             tray.rebuild(state);
             transcriber.transcribe(samples, state.config.languages.clone());
         }
