@@ -131,6 +131,13 @@
 - **v0.2.2** — .app bundle (permissions persist across upgrades)
 - **v0.2.3** — Gatekeeper fix, app icon, clean upgrade handoff
 
+### App icon fix (opaque background)
+
+- Previous `AppIcon.icns` had transparent background — invisible on macOS glass/light/tinted menubar themes
+- Replaced with white logo on solid dark (#1E1E1E) opaque background
+- Generated all required sizes (16x16 through 512x512@2x) via Swift + `iconutil`
+- macOS applies squircle mask automatically — works on all themes
+
 ## Future / Deferred
 
 - **Live transcribing** — streaming partial results while recording
