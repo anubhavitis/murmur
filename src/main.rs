@@ -107,6 +107,7 @@ fn handle_event(
             }
             match audio.start() {
                 Ok(()) => {
+                    platform::play_start_sound();
                     eprintln!("[murmur] recording...");
                     state.recording_state = RecordingState::Recording;
                     tray.rebuild(state);
@@ -118,6 +119,7 @@ fn handle_event(
             if state.recording_state != RecordingState::Recording {
                 return;
             }
+            platform::play_stop_sound();
             let samples = audio.stop();
             eprintln!("[murmur] transcribing...");
             state.recording_state = RecordingState::Transcribing;
