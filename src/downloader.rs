@@ -60,6 +60,7 @@ fn download_model_blocking(model: &str, dest: &PathBuf) -> Result<(), String> {
     file.write_all(&bytes)
         .map_err(|e| format!("failed to write model: {e}"))?;
 
+    let _ = fs::remove_file(dest);
     fs::rename(&tmp_path, dest)
         .map_err(|e| format!("failed to rename temp file: {e}"))?;
 
@@ -108,6 +109,7 @@ fn download_model_streaming(
         }
     }
 
+    let _ = fs::remove_file(dest);
     fs::rename(&tmp_path, dest)
         .map_err(|e| format!("failed to rename temp file: {e}"))?;
 
