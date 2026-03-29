@@ -29,7 +29,7 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
     let press_time = Arc::new(AtomicU64::new(0));
 
     thread::spawn(move || {
-        listen(move |event: Event| {
+        let result = listen(move |event: Event| {
             match event.event_type {
                 EventType::KeyPress(k) if k == key => {
                     let last = press_time.load(Ordering::SeqCst);
@@ -49,7 +49,10 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
                 }
                 _ => {}
             }
-        })
-        .expect("failed to listen for global key events");
+        });
+        if let Err(e) = result {
+            eprintln!("[murmur] error: hotkey listener failed: {e:?}");
+            eprintln!("[murmur] ensure Input Monitoring is granted in System Settings > Privacy & Security");
+        }
     });
 }

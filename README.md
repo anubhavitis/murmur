@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS-blue" alt="macOS">
+  <img src="https://img.shields.io/badge/platform-macOS_(Apple_Silicon)-blue" alt="macOS">
   <img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust">
   <img src="https://img.shields.io/badge/powered_by-whisper.cpp-green" alt="whisper.cpp">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
@@ -28,6 +28,43 @@ That's it. No cloud. No API keys. Everything runs locally on your machine via [w
 
 ---
 
+## Install
+
+### Homebrew (recommended)
+
+```sh
+brew tap anubhavitis/murmur
+brew install --cask murmur
+```
+
+### Script
+
+```sh
+curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/install.sh | sh
+```
+
+Murmur auto-starts on login and restarts on crash. On first launch, it downloads the `tiny.en` model (~74 MB).
+
+### Permissions
+
+After install, grant these in **System Settings > Privacy & Security**:
+
+| Permission | Why |
+|---|---|
+| **Input Monitoring** | Hotkey detection (Right Option / Caps Lock) |
+| **Microphone** | Audio capture for transcription |
+| **Accessibility** | Paste-at-cursor (simulates Cmd+V) |
+
+Look for `murmur` in each permission list and toggle it on.
+
+### Uninstall
+
+```sh
+curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/uninstall.sh | sh
+```
+
+---
+
 ## Features
 
 | Feature | Description |
@@ -38,8 +75,10 @@ That's it. No cloud. No API keys. Everything runs locally on your machine via [w
 | **Auto-download** | Grabs the `tiny.en` model on first launch |
 | **Clipboard or paste** | Copy to clipboard, or paste directly at cursor |
 | **Model selection** | English and multilingual variants: tiny through large |
-| **Live progress** | Download progress updates in-place in the menu |
-| **Animated icon** | Tray icon spins while recording |
+| **Language preferences** | Pick preferred languages, auto-detect among them |
+| **Audio feedback** | Beep on record start/stop |
+| **Animated icon** | Tray icon spins while recording and transcribing |
+| **Auto-start** | Launches on login via Launch Agent |
 
 ---
 
@@ -57,18 +96,42 @@ Models are downloaded from [HuggingFace](https://huggingface.co/ggerganov/whispe
 
 ---
 
-## Getting started
+## Configuration
+
+Config lives at `~/.murmur/config.json`:
+
+```json
+{
+  "selected_model": "tiny.en",
+  "output_mode": "paste_at_cursor",
+  "hotkey": "right_alt",
+  "languages": ["en"]
+}
+```
+
+| Setting | Options |
+|---|---|
+| `output_mode` | `clipboard`, `paste_at_cursor` |
+| `hotkey` | `right_alt`, `caps_lock` |
+| `selected_model` | Any model from the table above |
+| `languages` | Array of [whisper language codes](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py) (e.g. `["en", "hi"]`) |
+
+---
+
+## Build from source
+
+<details>
+<summary>For developers</summary>
 
 ### Requirements
 
-| Requirement | macOS | Windows |
-|---|---|---|
-| Rust | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` | [rustup.rs](https://rustup.rs) |
-| cmake | `brew install cmake` | `winget install Kitware.CMake` |
-| C compiler | Included with Xcode CLT | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) |
-| Permissions | Input Monitoring + Microphone | — |
+| Requirement | macOS |
+|---|---|
+| Rust 1.85+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
+| cmake | `brew install cmake` |
+| C compiler | Included with Xcode CLT (`xcode-select --install`) |
 
-> whisper.cpp is compiled from source automatically during `cargo build`. No manual installation needed.
+> whisper.cpp is compiled from source automatically during `cargo build`.
 
 ### Build & run
 
@@ -79,27 +142,15 @@ cargo build --release
 cargo run --release
 ```
 
-On first launch, Murmur downloads the `tiny.en` model (~74 MB) automatically.
+### Release
 
----
-
-## Configuration
-
-Config lives at `~/.murmur/config.json`:
-
-```json
-{
-  "selected_model": "tiny.en",
-  "output_mode": "paste_at_cursor",
-  "hotkey": "right_alt"
-}
+```sh
+./release.sh
 ```
 
-| Setting | Options |
-|---|---|
-| `output_mode` | `clipboard`, `paste_at_cursor` |
-| `hotkey` | `right_alt`, `caps_lock` |
-| `selected_model` | Any model from the table above |
+Builds the binary, creates a tar.gz, generates the Homebrew cask formula, and prints upload instructions.
+
+</details>
 
 ---
 
@@ -115,10 +166,9 @@ src/
   audio.rs        Audio capture + 16kHz resampling (cpal)
   transcriber.rs  Whisper inference on background thread
   downloader.rs   Model download from HuggingFace
-  platform/       OS-specific code (paste modifier key)
+  languages.rs    Whisper language registry (100 languages)
+  platform/       OS-specific code (paste key, sounds)
 ```
-
-**Design principles:** single binary, no async runtime, sync threads + `EventLoopProxy` for all communication, platform-specific code isolated in `src/platform/`.
 
 ---
 
@@ -126,8 +176,6 @@ src/
 
 - [ ] Live transcription (streaming partial results while recording)
 - [ ] Windows support (code is cross-platform ready, untested)
-- [ ] Distributable `.app` bundle with signing
-- [ ] Language selection
 - [ ] CoreML backend for Apple Silicon
 
 ---
