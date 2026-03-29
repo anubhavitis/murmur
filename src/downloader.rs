@@ -42,6 +42,22 @@ pub fn spawn_download(proxy: EventLoopProxy<AppEvent>, model: String) {
     });
 }
 
+pub fn spawn_upgrade(proxy: EventLoopProxy<AppEvent>, model: String) {
+    thread::spawn(move || {
+        let path = model_path(&model);
+        let _ = proxy.send_event(AppEvent::ModelDownloadProgress(model.clone(), 0));
+
+        match download_model_streaming(&model, &path, &proxy) {
+            Ok(()) => {
+                let _ = proxy.send_event(AppEvent::BackendUpgradeReady);
+            }
+            Err(e) => {
+                eprintln!("[murmur] background upgrade failed: {e}");
+            }
+        }
+    });
+}
+
 fn download_model_blocking(model: &str, dest: &PathBuf) -> Result<(), String> {
     let url = format!("{HF_BASE}/ggml-{model}.bin");
 

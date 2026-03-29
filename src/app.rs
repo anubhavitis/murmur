@@ -9,7 +9,6 @@ pub enum MenuCommand {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub enum AppEvent {
     HotkeyPressed,
     HotkeyReleased,
@@ -18,6 +17,7 @@ pub enum AppEvent {
     TranscriberReady,
     ModelDownloadProgress(String, u8),
     ModelDownloadComplete(String),
+    BackendUpgradeReady,
     Menu(MenuCommand),
     Quit,
 }
@@ -43,6 +43,7 @@ pub struct AppState {
     pub recording_state: RecordingState,
     pub download_progress: Option<(String, u8)>,
     pub pending_restart: bool,
+    pub upgrading_backend: bool,
     pub permissions: Permissions,
     pub transcriber_ready: bool,
 }
@@ -54,6 +55,7 @@ impl AppState {
             recording_state: RecordingState::Idle,
             download_progress: None,
             pending_restart: false,
+            upgrading_backend: false,
             permissions: Permissions::default(),
             transcriber_ready: false,
         }

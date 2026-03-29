@@ -68,6 +68,8 @@ fn all_permissions_granted(state: &AppState) -> bool {
     state.permissions.microphone && state.permissions.accessibility
 }
 
+const BOOTSTRAP_MODEL: &str = "tiny.en";
+
 fn main() {
     rotate_log();
     eprintln!("[murmur] starting...");
@@ -79,13 +81,13 @@ fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
-    let transcriber = Transcriber::new(proxy.clone(), state.config.selected_tier.whisper_model());
+    // Always bootstrap with tiny.en for instant startup
+    let mut transcriber = Transcriber::new(proxy.clone(), BOOTSTRAP_MODEL);
 
     let download_proxy = proxy.clone();
 
     hotkey::spawn_listener(proxy, state.config.hotkey.clone());
 
-    // Initial permission check
     check_permissions(&mut state);
 
     let menu_channel = MenuEvent::receiver();
@@ -117,7 +119,7 @@ fn main() {
                 &mut state,
                 &mut tray,
                 &mut audio,
-                &transcriber,
+                &mut transcriber,
                 &mut clipboard,
                 &download_proxy,
             );
@@ -129,7 +131,7 @@ fn main() {
                 &mut state,
                 &mut tray,
                 &mut audio,
-                &transcriber,
+                &mut transcriber,
                 &mut clipboard,
                 &download_proxy,
             );
@@ -150,7 +152,7 @@ fn handle_event(
     state: &mut AppState,
     tray: &mut Tray,
     audio: &mut AudioCapture,
-    transcriber: &Transcriber,
+    transcriber: &mut Transcriber,
     clipboard: &mut Clipboard,
     download_proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
 ) {
@@ -220,6 +222,18 @@ fn handle_event(
             eprintln!("[murmur] model loaded, ready");
             state.transcriber_ready = true;
             tray.rebuild(state);
+
+            // Check if we need to upgrade from bootstrap model
+            let target = state.config.selected_tier.whisper_model();
+            if target != BOOTSTRAP_MODEL && !state.upgrading_backend {
+                if downloader::model_path(target).exists() {
+                    let _ = download_proxy.send_event(AppEvent::BackendUpgradeReady);
+                } else {
+                    eprintln!("[murmur] background download: {target}");
+                    state.upgrading_backend = true;
+                    downloader::spawn_upgrade(download_proxy.clone(), target.to_string());
+                }
+            }
         }
         AppEvent::TranscriptionError(err) => {
             eprintln!("[murmur] error: {err}");
@@ -242,6 +256,15 @@ fn handle_event(
                 platform::self_restart();
             }
             tray.rebuild(state);
+        }
+        AppEvent::BackendUpgradeReady => {
+            let target = state.config.selected_tier.whisper_model();
+            eprintln!("[murmur] upgrading to {target}");
+            state.transcriber_ready = false;
+            state.upgrading_backend = false;
+            state.download_progress = None;
+            tray.rebuild(state);
+            *transcriber = Transcriber::new(download_proxy.clone(), target);
         }
         AppEvent::Menu(cmd) => handle_menu_command(cmd, state, tray, download_proxy),
         AppEvent::Quit => {
