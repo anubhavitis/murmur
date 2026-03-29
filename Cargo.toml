@@ -3,6 +3,10 @@ name = "murmur"
 version = "0.2.3"
 edition = "2024"
 
+[features]
+default = []
+fluid_audio = []
+
 [dependencies]
 tao = "0.34"
 tray-icon = "0.19"

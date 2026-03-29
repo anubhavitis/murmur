@@ -1,16 +1,48 @@
 mod whisper_backend;
 
+#[cfg(feature = "fluid_audio")]
+mod fluid_backend;
+
 use std::sync::mpsc;
 use std::thread;
 
 use tao::event_loop::EventLoopProxy;
 
 use crate::app::AppEvent;
+use crate::config::Tier;
 use crate::downloader;
+use crate::languages::is_supported_on_tier;
 
 pub trait TranscriptionBackend: Send {
     fn transcribe(&mut self, samples: &[f32], languages: &[String]) -> Result<String, String>;
 }
+
+#[derive(Debug, PartialEq)]
+pub enum BackendChoice {
+    Whisper(String),
+    #[cfg(feature = "fluid_audio")]
+    FluidAudio,
+}
+
+pub fn resolve_backend(tier: &Tier, languages: &[String]) -> BackendChoice {
+    match tier {
+        Tier::Fast => {
+            let all_supported = languages.iter().all(|l| is_supported_on_tier(l, tier));
+
+            #[cfg(feature = "fluid_audio")]
+            if all_supported && crate::platform::is_apple_silicon() {
+                return BackendChoice::FluidAudio;
+            }
+
+            let _ = all_supported;
+            BackendChoice::Whisper(tier.whisper_model().to_string())
+        }
+        Tier::Standard | Tier::Accurate => {
+            BackendChoice::Whisper(tier.whisper_model().to_string())
+        }
+    }
+}
+
 
 fn suppress_whisper_logs() {
     unsafe {

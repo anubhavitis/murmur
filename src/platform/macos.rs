@@ -72,6 +72,10 @@ pub fn prompt_input_monitoring() {
         .spawn();
 }
 
+pub fn is_apple_silicon() -> bool {
+    std::env::consts::ARCH == "aarch64"
+}
+
 pub fn self_restart() -> ! {
     use std::os::unix::process::CommandExt;
     let exe = std::env::current_exe().expect("failed to get current exe path");
