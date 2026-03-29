@@ -16,13 +16,54 @@ pub enum HotkeyChoice {
     CapsLock,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum Tier {
+    Fast,
+    Standard,
+    Accurate,
+}
+
+impl Tier {
+    pub fn whisper_model(&self) -> &str {
+        match self {
+            Tier::Fast => "small",
+            Tier::Standard => "medium",
+            Tier::Accurate => "large-v3",
+        }
+    }
+
+    pub fn display_name(&self) -> &str {
+        match self {
+            Tier::Fast => "Fast",
+            Tier::Standard => "Standard",
+            Tier::Accurate => "Accurate",
+        }
+    }
+
+    fn from_legacy_model(model: &str) -> Self {
+        match model {
+            "tiny.en" | "tiny" | "base.en" | "base" | "small.en" | "small" => Tier::Fast,
+            "medium.en" | "medium" => Tier::Standard,
+            _ => Tier::Accurate,
+        }
+    }
+}
+
+fn default_tier() -> Tier {
+    Tier::Fast
+}
+
 fn default_languages() -> Vec<String> {
     vec!["en".to_string()]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    pub selected_model: String,
+    #[serde(default = "default_tier")]
+    pub selected_tier: Tier,
+    #[serde(default, skip_serializing)]
+    selected_model: Option<String>,
     pub output_mode: OutputMode,
     pub hotkey: HotkeyChoice,
     #[serde(default = "default_languages")]
@@ -32,7 +73,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            selected_model: "tiny.en".to_string(),
+            selected_tier: Tier::Fast,
+            selected_model: None,
             output_mode: OutputMode::Clipboard,
             hotkey: HotkeyChoice::RightAlt,
             languages: default_languages(),
@@ -74,6 +116,10 @@ impl Config {
         };
         if config.languages.is_empty() {
             config.languages.push("en".to_string());
+        }
+        if let Some(model) = config.selected_model.take() {
+            config.selected_tier = Tier::from_legacy_model(&model);
+            config.save();
         }
         config
     }

@@ -235,7 +235,7 @@ impl Tray {
             .unwrap();
 
         let current_model = MenuItem::new(
-            format!("Model: {}", state.config.selected_model),
+            format!("Quality: {}", state.config.selected_tier.display_name()),
             false,
             None,
         );

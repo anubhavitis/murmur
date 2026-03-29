@@ -79,7 +79,7 @@ fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
-    let transcriber = Transcriber::new(proxy.clone(), &state.config.selected_model);
+    let transcriber = Transcriber::new(proxy.clone(), state.config.selected_tier.whisper_model());
 
     let download_proxy = proxy.clone();
 
@@ -236,10 +236,9 @@ fn handle_event(
                 tray.update_progress(&model, pct);
             }
         }
-        AppEvent::ModelDownloadComplete(model) => {
+        AppEvent::ModelDownloadComplete(_model) => {
             state.download_progress = None;
             state.refresh_models();
-            state.config.selected_model = model;
             state.config.save();
             tray.rebuild(state);
         }
@@ -268,7 +267,8 @@ fn handle_menu_command(
             platform::self_restart();
         }
         MenuCommand::SelectModel(model) => {
-            state.config.selected_model = model;
+            state.config.selected_tier = config::Tier::Fast;
+            let _ = model;
             state.config.save();
             tray.rebuild(state);
         }
