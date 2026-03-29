@@ -64,14 +64,18 @@ impl Config {
     pub fn load() -> Self {
         Self::ensure_dirs();
         let path = Self::config_path();
-        if path.exists() {
+        let mut config = if path.exists() {
             let data = fs::read_to_string(&path).unwrap_or_default();
             serde_json::from_str(&data).unwrap_or_default()
         } else {
             let config = Self::default();
             config.save();
             config
+        };
+        if config.languages.is_empty() {
+            config.languages.push("en".to_string());
         }
+        config
     }
 
     pub fn save(&self) {

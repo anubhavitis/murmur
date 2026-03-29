@@ -79,13 +79,7 @@ fn main() {
     let event_loop = EventLoopBuilder::<AppEvent>::with_user_event().build();
     let proxy = event_loop.create_proxy();
 
-    let transcriber = match Transcriber::new(proxy.clone(), &state.config.selected_model) {
-        Ok(t) => t,
-        Err(e) => {
-            eprintln!("[murmur] failed to init transcriber: {e}");
-            std::process::exit(1);
-        }
-    };
+    let transcriber = Transcriber::new(proxy.clone(), &state.config.selected_model);
 
     let download_proxy = proxy.clone();
 
@@ -169,6 +163,10 @@ fn handle_event(
                 );
                 return;
             }
+            if !state.transcriber_ready {
+                eprintln!("[murmur] model still loading...");
+                return;
+            }
             if !state.permissions.microphone {
                 platform::play_stop_sound();
                 eprintln!("[murmur] microphone permission not granted");
@@ -218,6 +216,11 @@ fn handle_event(
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);
         }
+        AppEvent::TranscriberReady => {
+            eprintln!("[murmur] model loaded, ready");
+            state.transcriber_ready = true;
+            tray.rebuild(state);
+        }
         AppEvent::TranscriptionError(err) => {
             eprintln!("[murmur] error: {err}");
             state.recording_state = RecordingState::Idle;
@@ -262,7 +265,7 @@ fn handle_menu_command(
         MenuCommand::SetHotkey(hotkey) => {
             state.config.hotkey = hotkey;
             state.config.save();
-            tray.rebuild(state);
+            platform::self_restart();
         }
         MenuCommand::SelectModel(model) => {
             state.config.selected_model = model;
@@ -273,6 +276,8 @@ fn handle_menu_command(
             if state.download_progress.is_some() {
                 return;
             }
+            state.download_progress = Some((model.clone(), 0));
+            tray.rebuild(state);
             downloader::spawn_download(proxy.clone(), model);
         }
         MenuCommand::ToggleLanguage(code) => {
@@ -283,6 +288,9 @@ fn handle_menu_command(
                 state.config.languages.remove(pos);
             } else {
                 state.config.languages.push(code);
+            }
+            if state.config.languages.is_empty() {
+                state.config.languages.push("en".to_string());
             }
             state.config.save();
             tray.rebuild(state);

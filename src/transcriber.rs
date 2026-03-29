@@ -20,27 +20,63 @@ struct TranscribeRequest {
 
 pub struct Transcriber {
     sender: mpsc::Sender<TranscribeRequest>,
+    proxy: EventLoopProxy<AppEvent>,
 }
 
 impl Transcriber {
-    pub fn new(proxy: EventLoopProxy<AppEvent>, model: &str) -> Result<Self, String> {
+    pub fn new(proxy: EventLoopProxy<AppEvent>, model: &str) -> Self {
         suppress_whisper_logs();
 
-        let model_path = downloader::ensure_model(model)?;
-        let model_path_str = model_path
-            .to_str()
-            .ok_or("invalid model path")?
-            .to_string();
-
         let is_english_model = model.ends_with(".en");
+        let model_name = model.to_string();
         let (sender, receiver) = mpsc::channel::<TranscribeRequest>();
+        let thread_proxy = proxy.clone();
 
         thread::spawn(move || {
-            let ctx = WhisperContext::new_with_params(
+            let model_path = match downloader::ensure_model(&model_name) {
+                Ok(p) => p,
+                Err(e) => {
+                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
+                        format!("model load failed: {e}"),
+                    ));
+                    return;
+                }
+            };
+
+            let model_path_str = match model_path.to_str() {
+                Some(s) => s.to_string(),
+                None => {
+                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
+                        "invalid model path".to_string(),
+                    ));
+                    return;
+                }
+            };
+
+            let ctx = match WhisperContext::new_with_params(
                 &model_path_str,
                 WhisperContextParameters::default(),
-            )
-            .expect("failed to load whisper model");
+            ) {
+                Ok(c) => c,
+                Err(e) => {
+                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
+                        format!("failed to load whisper model: {e}"),
+                    ));
+                    return;
+                }
+            };
+
+            let mut state = match ctx.create_state() {
+                Ok(s) => s,
+                Err(e) => {
+                    let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
+                        format!("failed to create whisper state: {e}"),
+                    ));
+                    return;
+                }
+            };
+
+            let _ = thread_proxy.send_event(AppEvent::TranscriberReady);
 
             while let Ok(req) = receiver.recv() {
                 let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
@@ -50,8 +86,6 @@ impl Transcriber {
                 params.set_print_realtime(false);
                 params.set_print_timestamps(false);
                 params.set_n_threads(4);
-
-                let mut state = ctx.create_state().expect("failed to create whisper state");
 
                 let lang = if is_english_model {
                     "en".to_string()
@@ -71,15 +105,16 @@ impl Transcriber {
                         }
                         let text = text.trim().to_string();
                         if text.is_empty() {
-                            let _ = proxy.send_event(AppEvent::TranscriptionError(
+                            let _ = thread_proxy.send_event(AppEvent::TranscriptionError(
                                 "no speech detected".to_string(),
                             ));
                         } else {
-                            let _ = proxy.send_event(AppEvent::TranscriptionComplete(text));
+                            let _ =
+                                thread_proxy.send_event(AppEvent::TranscriptionComplete(text));
                         }
                     }
                     Err(e) => {
-                        let _ = proxy.send_event(AppEvent::TranscriptionError(format!(
+                        let _ = thread_proxy.send_event(AppEvent::TranscriptionError(format!(
                             "transcription failed: {e}"
                         )));
                     }
@@ -87,11 +122,15 @@ impl Transcriber {
             }
         });
 
-        Ok(Self { sender })
+        Self { sender, proxy }
     }
 
     pub fn transcribe(&self, samples: Vec<f32>, languages: Vec<String>) {
-        let _ = self.sender.send(TranscribeRequest { samples, languages });
+        if self.sender.send(TranscribeRequest { samples, languages }).is_err() {
+            let _ = self.proxy.send_event(AppEvent::TranscriptionError(
+                "transcriber unavailable".to_string(),
+            ));
+        }
     }
 }
 

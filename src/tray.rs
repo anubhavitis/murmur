@@ -150,10 +150,14 @@ impl Tray {
     fn build_menu(state: &AppState) -> (Menu, MenuIds) {
         let menu = Menu::new();
 
-        let status_text = match &state.recording_state {
-            RecordingState::Idle => "Status: Idle",
-            RecordingState::Recording => "Status: Recording...",
-            RecordingState::Transcribing => "Status: Transcribing...",
+        let status_text = if !state.transcriber_ready {
+            "Status: Loading model..."
+        } else {
+            match &state.recording_state {
+                RecordingState::Idle => "Status: Idle",
+                RecordingState::Recording => "Status: Recording...",
+                RecordingState::Transcribing => "Status: Transcribing...",
+            }
         };
         let status = MenuItem::new(status_text, false, None);
         menu.append(&status).unwrap();

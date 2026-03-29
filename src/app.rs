@@ -15,6 +15,7 @@ pub enum AppEvent {
     HotkeyReleased,
     TranscriptionComplete(String),
     TranscriptionError(String),
+    TranscriberReady,
     ModelDownloadProgress(String, u8),
     ModelDownloadComplete(String),
     Menu(MenuCommand),
@@ -43,6 +44,7 @@ pub struct AppState {
     pub download_progress: Option<(String, u8)>,
     pub installed_models: Vec<String>,
     pub permissions: Permissions,
+    pub transcriber_ready: bool,
 }
 
 impl AppState {
@@ -54,6 +56,7 @@ impl AppState {
             download_progress: None,
             installed_models,
             permissions: Permissions::default(),
+            transcriber_ready: false,
         }
     }
 

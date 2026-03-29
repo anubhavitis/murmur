@@ -22,8 +22,21 @@ pub fn play_stop_sound() {
 }
 
 pub fn check_microphone() -> bool {
-    use cpal::traits::HostTrait;
-    cpal::default_host().default_input_device().is_some()
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let Some(device) = cpal::default_host().default_input_device() else {
+        return false;
+    };
+    let Ok(config) = device.default_input_config() else {
+        return false;
+    };
+    device
+        .build_input_stream(
+            &config.into(),
+            |_: &[f32], _: &cpal::InputCallbackInfo| {},
+            |_| {},
+            None,
+        )
+        .is_ok()
 }
 
 pub fn check_accessibility() -> bool {
