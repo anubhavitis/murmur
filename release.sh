@@ -29,8 +29,9 @@ strip "$BINARY" 2>/dev/null || echo "Warning: strip not available, skipping"
 echo "Creating .app bundle..."
 STAGING=$(mktemp -d)
 APP_DIR="${STAGING}/Murmur.app/Contents"
-mkdir -p "${APP_DIR}/MacOS"
+mkdir -p "${APP_DIR}/MacOS" "${APP_DIR}/Resources"
 cp "$BINARY" "${APP_DIR}/MacOS/murmur"
+cp dist/AppIcon.icns "${APP_DIR}/Resources/AppIcon.icns"
 sed "s/__VERSION__/${VERSION}/g" dist/Info.plist > "${APP_DIR}/Info.plist"
 
 echo "Creating archive..."
