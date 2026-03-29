@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-INSTALL_DIR="$HOME/.murmur/bin"
+APP_PATH="/Applications/Murmur.app"
+OLD_BIN="$HOME/.murmur/bin/murmur"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.murmur.app.plist"
 MURMUR_DIR="$HOME/.murmur"
 
@@ -14,14 +15,16 @@ if launchctl list 2>/dev/null | grep -q "com.murmur.app"; then
 fi
 rm -f "$PLIST_PATH"
 
-# Remove binary
-rm -f "${INSTALL_DIR}/murmur"
-rmdir "${INSTALL_DIR}" 2>/dev/null || true
+# Remove .app bundle
+rm -rf "$APP_PATH"
 
-echo "Murmur binary and Launch Agent removed."
+# Remove old bare-binary install if present
+rm -f "$OLD_BIN"
+rmdir "$HOME/.murmur/bin" 2>/dev/null || true
+
+echo "Murmur.app and Launch Agent removed."
 echo ""
 
-# Ask about config and models (handle non-interactive stdin)
 if [ -t 0 ]; then
     read -p "Remove config and models too? (~/.murmur/) [y/N] " -n 1 -r
     echo ""
@@ -40,7 +43,7 @@ fi
 
 echo ""
 echo "Murmur uninstalled."
-echo "You may also want to remove 'murmur' from:"
+echo "You may also want to remove 'Murmur' from:"
 echo "  System Settings > Privacy & Security > Input Monitoring"
 echo "  System Settings > Privacy & Security > Microphone"
 echo "  System Settings > Privacy & Security > Accessibility"

@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-# Parse version from [package] section only
 VERSION=$(sed -n '/^\[package\]/,/^\[/p' Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
 if [ -z "$VERSION" ]; then
     echo "Error: Could not parse version from Cargo.toml"
@@ -9,10 +8,9 @@ if [ -z "$VERSION" ]; then
 fi
 
 BINARY="target/release/murmur"
-ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.tar.gz"
+ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.zip"
 TAG="v${VERSION}"
 
-# Check if tag already exists
 if git rev-parse "$TAG" >/dev/null 2>&1; then
     echo "Warning: Tag ${TAG} already exists. Bump version in Cargo.toml first."
     read -p "Continue anyway? [y/N] " -n 1 -r
@@ -28,12 +26,19 @@ cargo build --release
 echo "Stripping binary..."
 strip "$BINARY" 2>/dev/null || echo "Warning: strip not available, skipping"
 
+echo "Creating .app bundle..."
+STAGING=$(mktemp -d)
+APP_DIR="${STAGING}/Murmur.app/Contents"
+mkdir -p "${APP_DIR}/MacOS"
+cp "$BINARY" "${APP_DIR}/MacOS/murmur"
+sed "s/__VERSION__/${VERSION}/g" dist/Info.plist > "${APP_DIR}/Info.plist"
+
 echo "Creating archive..."
-tar -czf "$ARCHIVE" -C target/release murmur
+cd "$STAGING" && zip -rq "$OLDPWD/$ARCHIVE" Murmur.app && cd "$OLDPWD"
+rm -rf "$STAGING"
 
 SHA=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
 
-# Generate cask formula
 CASK_FILE="dist/murmur.rb"
 sed -e "s/__VERSION__/${VERSION}/g" -e "s/__SHA256__/${SHA}/g" dist/murmur.rb.template > "$CASK_FILE"
 
@@ -46,7 +51,6 @@ echo "Size:     $(du -h "$ARCHIVE" | awk '{print $1}')"
 echo "Cask:     ${CASK_FILE}"
 echo ""
 
-# Create git tag
 if ! git rev-parse "$TAG" >/dev/null 2>&1; then
     echo "Creating git tag ${TAG}..."
     git tag -a "$TAG" -m "Release ${TAG}"

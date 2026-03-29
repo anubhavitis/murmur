@@ -2,9 +2,11 @@
 set -euo pipefail
 
 REPO="anubhavitis/murmur"
-INSTALL_DIR="$HOME/.murmur/bin"
+APP_PATH="/Applications/Murmur.app"
+BIN_PATH="${APP_PATH}/Contents/MacOS/murmur"
 PLIST_PATH="$HOME/Library/LaunchAgents/com.murmur.app.plist"
 LOG_PATH="$HOME/.murmur/murmur.log"
+OLD_BIN="$HOME/.murmur/bin/murmur"
 TMP_DIR=""
 
 cleanup() {
@@ -21,13 +23,11 @@ echo "  Murmur Installer"
 echo "  ─────────────────"
 echo ""
 
-# Don't run as root
 if [ "$(id -u)" -eq 0 ]; then
-    err "Do not run this script with sudo. It installs to your home directory."
+    err "Do not run this script with sudo."
     exit 1
 fi
 
-# Check architecture
 ARCH=$(uname -m)
 if [ "$ARCH" != "arm64" ]; then
     err "Murmur currently supports Apple Silicon (arm64) only."
@@ -36,7 +36,6 @@ if [ "$ARCH" != "arm64" ]; then
 fi
 ok "Architecture: arm64"
 
-# Check macOS
 if [ "$(uname -s)" != "Darwin" ]; then
     err "Murmur currently supports macOS only."
     exit 1
@@ -45,7 +44,6 @@ ok "Platform: macOS $(sw_vers -productVersion 2>/dev/null || echo 'unknown')"
 
 echo ""
 
-# Get latest version
 info "Fetching latest release..."
 RELEASE_JSON=$(curl -sSf "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null) || {
     err "Could not fetch latest version."
@@ -60,12 +58,11 @@ if [ -z "$VERSION" ]; then
 fi
 ok "Latest version: v${VERSION}"
 
-# Download
-ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.tar.gz"
+ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.zip"
 URL="https://github.com/${REPO}/releases/download/v${VERSION}/${ARCHIVE}"
 TMP_DIR=$(mktemp -d)
 
-info "Downloading binary..."
+info "Downloading..."
 curl -sSfL "$URL" -o "${TMP_DIR}/${ARCHIVE}" || {
     err "Download failed. Check if release v${VERSION} exists:"
     err "  https://github.com/${REPO}/releases"
@@ -74,18 +71,17 @@ curl -sSfL "$URL" -o "${TMP_DIR}/${ARCHIVE}" || {
 ok "Downloaded ${ARCHIVE}"
 
 info "Extracting..."
-tar -xzf "${TMP_DIR}/${ARCHIVE}" -C "$TMP_DIR"
+unzip -qo "${TMP_DIR}/${ARCHIVE}" -d "$TMP_DIR"
 
-MURMUR_BIN=$(find "$TMP_DIR" -name murmur -type f | head -1)
-if [ -z "$MURMUR_BIN" ]; then
-    err "Binary not found in archive."
+if [ ! -d "${TMP_DIR}/Murmur.app" ]; then
+    err "Murmur.app not found in archive."
     exit 1
 fi
-ok "Extracted binary"
+ok "Extracted Murmur.app"
 
 echo ""
 
-# Stop existing instance BEFORE replacing binary
+# Stop existing instance
 if launchctl list 2>/dev/null | grep -q "com.murmur.app"; then
     info "Stopping existing Murmur instance..."
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
@@ -93,13 +89,27 @@ if launchctl list 2>/dev/null | grep -q "com.murmur.app"; then
     ok "Stopped previous instance"
 fi
 
-# Install binary
-info "Installing to ${INSTALL_DIR}/murmur"
-mkdir -p "$INSTALL_DIR"
-mv "$MURMUR_BIN" "${INSTALL_DIR}/murmur"
-chmod +x "${INSTALL_DIR}/murmur"
-xattr -cr "${INSTALL_DIR}/murmur" 2>/dev/null || true
-ok "Binary installed"
+# Clean up old bare-binary install
+if [ -f "$OLD_BIN" ]; then
+    info "Removing old binary at ${OLD_BIN}..."
+    rm -f "$OLD_BIN"
+    rmdir "$HOME/.murmur/bin" 2>/dev/null || true
+    ok "Old binary removed"
+fi
+
+# Install .app bundle
+if [ -d "$APP_PATH" ] && [ ! -w "$APP_PATH" ]; then
+    err "Cannot overwrite ${APP_PATH} — try: sudo rm -rf ${APP_PATH}"
+    exit 1
+fi
+info "Installing to ${APP_PATH}..."
+rm -rf "$APP_PATH"
+mv "${TMP_DIR}/Murmur.app" "$APP_PATH"
+xattr -cr "$APP_PATH" 2>/dev/null || true
+ok "Murmur.app installed"
+
+# Ensure config/models dir
+mkdir -p "$HOME/.murmur"
 
 # Install Launch Agent
 info "Setting up Launch Agent (auto-start on login)..."
@@ -111,7 +121,7 @@ cat > "$PLIST_PATH" <<EOF
     <key>Label</key>
     <string>com.murmur.app</string>
     <key>Program</key>
-    <string>${INSTALL_DIR}/murmur</string>
+    <string>${BIN_PATH}</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -130,7 +140,7 @@ cat > "$PLIST_PATH" <<EOF
 </dict>
 </plist>
 EOF
-ok "Launch Agent installed at ${PLIST_PATH}"
+ok "Launch Agent installed"
 
 info "Starting Murmur..."
 launchctl load "$PLIST_PATH"
@@ -147,6 +157,7 @@ echo "  │  2. Accessibility     — toggle on in Settings       │"
 echo "  │  3. Input Monitoring  — toggle on in Settings       │"
 echo "  │                                                     │"
 echo "  │  Settings panes open automatically. Just toggle on. │"
+echo "  │  Permissions persist across upgrades.               │"
 echo "  └─────────────────────────────────────────────────────┘"
 echo ""
 echo "  Config:  ~/.murmur/config.json"
