@@ -9,11 +9,14 @@ cask "murmur" do
 
   depends_on arch: :arm64
 
+  preflight do
+    system_command "/bin/mkdir", args: ["-p", "#{Dir.home}/.murmur/bin"]
+  end
+
   artifact "murmur", target: "#{Dir.home}/.murmur/bin/murmur"
 
   postflight do
     system_command "/usr/bin/xattr", args: ["-cr", "#{Dir.home}/.murmur/bin/murmur"]
-    system_command "/bin/mkdir", args: ["-p", "#{Dir.home}/.murmur/bin"]
 
     plist_content = <<~XML
       <?xml version="1.0" encoding="UTF-8"?>
@@ -31,6 +34,8 @@ cask "murmur" do
               <key>SuccessfulExit</key>
               <false/>
           </dict>
+          <key>ThrottleInterval</key>
+          <integer>30</integer>
           <key>ProcessType</key>
           <string>Interactive</string>
           <key>StandardOutPath</key>
@@ -46,8 +51,14 @@ cask "murmur" do
     system_command "/bin/launchctl", args: ["load", plist_path]
   end
 
-  uninstall launchctl: "com.murmur.app",
-            delete: "#{Dir.home}/.murmur/bin/murmur"
+  uninstall script: {
+    executable: "/bin/launchctl",
+    args: ["unload", "#{Dir.home}/Library/LaunchAgents/com.murmur.app.plist"],
+  },
+  delete: [
+    "#{Dir.home}/.murmur/bin/murmur",
+    "#{Dir.home}/Library/LaunchAgents/com.murmur.app.plist",
+  ]
 
   zap delete: "#{Dir.home}/.murmur"
 end

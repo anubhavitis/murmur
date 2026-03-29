@@ -1,20 +1,41 @@
 #!/bin/bash
 set -euo pipefail
 
-VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+# Parse version from [package] section only
+VERSION=$(sed -n '/^\[package\]/,/^\[/p' Cargo.toml | grep '^version' | head -1 | sed 's/.*"\(.*\)".*/\1/')
+if [ -z "$VERSION" ]; then
+    echo "Error: Could not parse version from Cargo.toml"
+    exit 1
+fi
+
 BINARY="target/release/murmur"
 ARCHIVE="murmur-${VERSION}-aarch64-apple-darwin.tar.gz"
+TAG="v${VERSION}"
+
+# Check if tag already exists
+if git rev-parse "$TAG" >/dev/null 2>&1; then
+    echo "Warning: Tag ${TAG} already exists. Bump version in Cargo.toml first."
+    read -p "Continue anyway? [y/N] " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
 
 echo "Building murmur v${VERSION} (release)..."
 cargo build --release
 
 echo "Stripping binary..."
-strip "$BINARY"
+strip "$BINARY" 2>/dev/null || echo "Warning: strip not available, skipping"
 
 echo "Creating archive..."
 tar -czf "$ARCHIVE" -C target/release murmur
 
 SHA=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
+
+# Generate cask formula
+CASK_FILE="dist/murmur.rb"
+sed -e "s/__VERSION__/${VERSION}/g" -e "s/__SHA256__/${SHA}/g" dist/murmur.rb.template > "$CASK_FILE"
 
 echo ""
 echo "=== Release Ready ==="
@@ -22,19 +43,26 @@ echo "Version:  ${VERSION}"
 echo "Archive:  ${ARCHIVE}"
 echo "SHA256:   ${SHA}"
 echo "Size:     $(du -h "$ARCHIVE" | awk '{print $1}')"
+echo "Cask:     ${CASK_FILE}"
 echo ""
 
-# Generate cask formula
-CASK_FILE="dist/murmur.rb"
-sed -e "s/__VERSION__/${VERSION}/g" -e "s/__SHA256__/${SHA}/g" dist/murmur.rb.template > "$CASK_FILE"
-echo "Cask formula generated: ${CASK_FILE}"
-echo ""
-
-if command -v gh &>/dev/null; then
-    echo "GitHub CLI found. To create a release:"
-    echo "  gh release create v${VERSION} ${ARCHIVE} --title \"v${VERSION}\" --notes \"Release v${VERSION}\""
+# Create git tag
+if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+    echo "Creating git tag ${TAG}..."
+    git tag -a "$TAG" -m "Release ${TAG}"
+    echo "Push tag with: git push origin ${TAG}"
 else
-    echo "Upload ${ARCHIVE} to: https://github.com/anubhavitis/murmur/releases/new?tag=v${VERSION}"
+    echo "Tag ${TAG} already exists, skipping tag creation."
+fi
+
+echo ""
+if command -v gh &>/dev/null; then
+    echo "To create GitHub release:"
+    echo "  git push origin ${TAG}"
+    echo "  gh release create ${TAG} ${ARCHIVE} --title \"${TAG}\" --notes \"Release ${TAG}\""
+else
+    echo "1. Push the tag:  git push origin ${TAG}"
+    echo "2. Upload ${ARCHIVE} to: https://github.com/anubhavitis/murmur/releases/new?tag=${TAG}"
 fi
 
 echo ""

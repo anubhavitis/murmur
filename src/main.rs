@@ -23,13 +23,15 @@ use tray_icon::menu::MenuEvent;
 
 const ANIMATION_INTERVAL: Duration = Duration::from_millis(33);
 
-fn truncate_log() {
+fn rotate_log() {
     let log_path = Config::base_dir().join("murmur.log");
-    let _ = std::fs::File::create(log_path);
+    let prev_path = Config::base_dir().join("murmur.log.1");
+    let _ = std::fs::rename(&log_path, &prev_path);
+    let _ = std::fs::File::create(&log_path);
 }
 
 fn main() {
-    truncate_log();
+    rotate_log();
     eprintln!("[murmur] starting...");
     eprintln!("[murmur] grant permissions in System Settings > Privacy & Security:");
     eprintln!("[murmur]   - Input Monitoring (hotkey)");

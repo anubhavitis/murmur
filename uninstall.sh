@@ -8,7 +8,7 @@ MURMUR_DIR="$HOME/.murmur"
 echo "Uninstalling Murmur..."
 
 # Stop and unload Launch Agent
-if launchctl list | grep -q "com.murmur.app" 2>/dev/null; then
+if launchctl list 2>/dev/null | grep -q "com.murmur.app"; then
     echo "Stopping Murmur..."
     launchctl unload "$PLIST_PATH" 2>/dev/null || true
 fi
@@ -21,9 +21,16 @@ rmdir "${INSTALL_DIR}" 2>/dev/null || true
 echo "Murmur binary and Launch Agent removed."
 echo ""
 
-# Ask about config and models
-read -p "Remove config and models too? (~/.murmur/) [y/N] " -n 1 -r
-echo ""
+# Ask about config and models (handle non-interactive stdin)
+if [ -t 0 ]; then
+    read -p "Remove config and models too? (~/.murmur/) [y/N] " -n 1 -r
+    echo ""
+else
+    REPLY="n"
+    echo "Non-interactive mode: keeping config and models at ${MURMUR_DIR}"
+    echo "To remove manually: rm -rf ${MURMUR_DIR}"
+fi
+
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     rm -rf "$MURMUR_DIR"
     echo "Config and models removed."
