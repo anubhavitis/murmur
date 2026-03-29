@@ -42,6 +42,7 @@ pub struct AppState {
     pub config: Config,
     pub recording_state: RecordingState,
     pub download_progress: Option<(String, u8)>,
+    pub pending_restart: bool,
     pub permissions: Permissions,
     pub transcriber_ready: bool,
 }
@@ -52,6 +53,7 @@ impl AppState {
             config,
             recording_state: RecordingState::Idle,
             download_progress: None,
+            pending_restart: false,
             permissions: Permissions::default(),
             transcriber_ready: false,
         }

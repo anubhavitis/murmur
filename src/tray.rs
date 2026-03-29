@@ -131,9 +131,9 @@ impl Tray {
         let _ = self.icon.set_icon(Some(self.static_icon.clone()));
     }
 
-    pub fn update_progress(&self, model: &str, pct: u8) {
+    pub fn update_progress(&self, pct: u8, tier_name: &str) {
         if let Some(ref item) = self.ids.progress_item {
-            item.set_text(format!("Downloading: {model} ({pct}%)"));
+            item.set_text(format!("Preparing {tier_name} quality... ({pct}%)"));
         }
     }
 
@@ -288,10 +288,14 @@ impl Tray {
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 
-        let progress_item = if let Some((ref name, pct)) = state.download_progress {
+        let progress_item = if let Some((ref _name, pct)) = state.download_progress {
             menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
                 .unwrap();
-            let progress = MenuItem::new(format!("Downloading: {name} ({pct}%)"), false, None);
+            let label = format!(
+                "Preparing {} quality... ({pct}%)",
+                state.config.selected_tier.display_name()
+            );
+            let progress = MenuItem::new(label, false, None);
             menu.append(&progress).unwrap();
             Some(progress)
         } else {
