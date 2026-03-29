@@ -30,6 +30,7 @@ struct MenuIds {
     model_items: Vec<(String, MenuId)>,
     language_items: Vec<(String, MenuId)>,
     progress_item: Option<MenuItem>,
+    website: MenuId,
     quit: MenuId,
 }
 
@@ -247,6 +248,15 @@ impl Tray {
 
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
+        let version = MenuItem::new(
+            format!("Murmur v{}", env!("CARGO_PKG_VERSION")),
+            false,
+            None,
+        );
+        menu.append(&version).unwrap();
+        let website = MenuItem::new("Website", true, None);
+        let website_id = website.id().clone();
+        menu.append(&website).unwrap();
         let quit = MenuItem::new("Quit", true, None);
         let quit_id = quit.id().clone();
         menu.append(&quit).unwrap();
@@ -259,6 +269,7 @@ impl Tray {
             model_items,
             language_items,
             progress_item,
+            website: website_id,
             quit: quit_id,
         };
         (menu, ids)
@@ -269,6 +280,12 @@ impl Tray {
 
         if *id == self.ids.quit {
             return Some(AppEvent::Quit);
+        }
+        if *id == self.ids.website {
+            let _ = std::process::Command::new("open")
+                .arg("https://anubhavitis.github.io/murmur")
+                .spawn();
+            return None;
         }
         if *id == self.ids.output_clipboard {
             return Some(AppEvent::Menu(MenuCommand::SetOutputMode(
