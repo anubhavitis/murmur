@@ -41,6 +41,15 @@ impl Tier {
         }
     }
 
+    pub fn label_for_model(model: &str) -> &'static str {
+        match model {
+            "small.en" | "small" => "Fast",
+            "medium.en" | "medium" => "Standard",
+            "large-v3" => "Accurate",
+            _ => "Fast",
+        }
+    }
+
     fn from_legacy_model(model: &str) -> Self {
         match model {
             "tiny.en" | "tiny" | "base.en" | "base" | "small.en" | "small" => Tier::Fast,

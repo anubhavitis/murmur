@@ -274,7 +274,7 @@ fn handle_event(
             if first {
                 tray.rebuild(state);
             } else {
-                tray.update_progress(pct, state.config.selected_tier.display_name());
+                tray.update_progress(pct, config::Tier::label_for_model(&model));
             }
         }
         AppEvent::ModelDownloadComplete(_model) => {

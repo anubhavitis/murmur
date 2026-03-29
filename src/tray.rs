@@ -5,6 +5,7 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode, Tier};
+use crate::downloader;
 use crate::languages::{LANGUAGES, is_supported_on_tier};
 
 const FRAME_COUNT: usize = 36;
@@ -194,26 +195,24 @@ impl Tray {
 
         // Quality tier
         let tier_sub = Submenu::new("Quality", true);
-        let tier_fast =
-            CheckMenuItem::new("Fast", true, state.config.selected_tier == Tier::Fast, None);
-        let tier_standard = CheckMenuItem::new(
-            "Standard",
-            true,
-            state.config.selected_tier == Tier::Standard,
-            None,
-        );
-        let tier_accurate = CheckMenuItem::new(
-            "Accurate",
-            true,
-            state.config.selected_tier == Tier::Accurate,
-            None,
-        );
-        let tier_fast_id = tier_fast.id().clone();
-        let tier_standard_id = tier_standard.id().clone();
-        let tier_accurate_id = tier_accurate.id().clone();
-        tier_sub.append(&tier_fast).unwrap();
-        tier_sub.append(&tier_standard).unwrap();
-        tier_sub.append(&tier_accurate).unwrap();
+        let tiers = [Tier::Fast, Tier::Standard, Tier::Accurate];
+        let mut tier_ids = [None, None, None];
+        for (i, tier) in tiers.iter().enumerate() {
+            let is_selected = state.config.selected_tier == *tier;
+            let model = tier.whisper_model();
+            let ready = downloader::model_path(model).exists();
+            let label = if ready || is_selected {
+                tier.display_name().to_string()
+            } else {
+                format!("\u{2B07} {}", tier.display_name())
+            };
+            let item = CheckMenuItem::new(&label, true, is_selected, None);
+            tier_ids[i] = Some(item.id().clone());
+            tier_sub.append(&item).unwrap();
+        }
+        let tier_fast_id = tier_ids[0].clone().unwrap();
+        let tier_standard_id = tier_ids[1].clone().unwrap();
+        let tier_accurate_id = tier_ids[2].clone().unwrap();
         menu.append(&tier_sub).unwrap();
 
         // Languages
@@ -286,13 +285,11 @@ impl Tray {
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 
-        let progress_item = if let Some((ref _name, pct)) = state.download_progress {
+        let progress_item = if let Some((ref model_name, pct)) = state.download_progress {
             menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
                 .unwrap();
-            let label = format!(
-                "Preparing {} quality... ({pct}%)",
-                state.config.selected_tier.display_name()
-            );
+            let tier_label = Tier::label_for_model(model_name);
+            let label = format!("Preparing {tier_label} quality... ({pct}%)");
             let progress = MenuItem::new(label, false, None);
             menu.append(&progress).unwrap();
             Some(progress)
