@@ -22,6 +22,7 @@ use tray::Tray;
 use tray_icon::menu::MenuEvent;
 
 const ANIMATION_INTERVAL: Duration = Duration::from_millis(33);
+const PERMISSION_CHECK_INTERVAL: Duration = Duration::from_secs(2);
 
 fn rotate_log() {
     let log_path = Config::base_dir().join("murmur.log");
@@ -30,37 +31,46 @@ fn rotate_log() {
     let _ = std::fs::File::create(&log_path);
 }
 
-fn ensure_permissions() {
-    // Microphone: trigger prompt by briefly creating an input stream
-    use cpal::traits::{DeviceTrait, HostTrait};
-    let host = cpal::default_host();
-    if let Some(device) = host.default_input_device()
-        && let Ok(config) = device.default_input_config()
-    {
-        let _ = device.build_input_stream(
-            &config.into(),
-            |_data: &[f32], _: &cpal::InputCallbackInfo| {},
-            |_| {},
-            None,
-        );
+fn check_permissions(state: &mut AppState) -> bool {
+    let mut changed = false;
+
+    let mic = platform::check_microphone();
+    if mic != state.permissions.microphone {
+        state.permissions.microphone = mic;
+        changed = true;
+        if mic {
+            eprintln!("[murmur] microphone permission granted");
+        }
     }
 
-    // Accessibility: check and poll
-    if !platform::check_accessibility() {
-        platform::prompt_accessibility();
-        eprintln!("[murmur] waiting for accessibility permission...");
-        while !platform::check_accessibility() {
-            std::thread::sleep(Duration::from_secs(2));
+    let acc = platform::check_accessibility();
+    if acc != state.permissions.accessibility {
+        state.permissions.accessibility = acc;
+        changed = true;
+        if acc {
+            eprintln!("[murmur] accessibility permission granted");
         }
-        eprintln!("[murmur] accessibility granted");
     }
+
+    // Prompt sequentially: mic first, then accessibility
+    if !state.permissions.microphone && !state.permissions.prompted_mic {
+        platform::prompt_microphone();
+        state.permissions.prompted_mic = true;
+    } else if state.permissions.microphone && !state.permissions.accessibility && !state.permissions.prompted_accessibility {
+        platform::prompt_accessibility();
+        state.permissions.prompted_accessibility = true;
+    }
+
+    changed
+}
+
+fn all_permissions_granted(state: &AppState) -> bool {
+    state.permissions.microphone && state.permissions.accessibility
 }
 
 fn main() {
     rotate_log();
     eprintln!("[murmur] starting...");
-
-    ensure_permissions();
 
     let config = Config::load();
     let mut state = AppState::new(config);
@@ -81,15 +91,28 @@ fn main() {
 
     hotkey::spawn_listener(proxy, state.config.hotkey.clone());
 
+    // Initial permission check
+    check_permissions(&mut state);
+
     let menu_channel = MenuEvent::receiver();
     let mut tray = Tray::new(&state);
     let mut clipboard = Clipboard::new().expect("failed to init clipboard");
+    let mut last_perm_check = Instant::now();
 
     event_loop.run(move |event, _, control_flow| {
-        if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event
-            && state.recording_state != RecordingState::Idle
-        {
-            tray.advance_frame();
+        if let Event::NewEvents(StartCause::ResumeTimeReached { .. }) = &event {
+            if state.recording_state != RecordingState::Idle {
+                tray.advance_frame();
+            }
+
+            if !all_permissions_granted(&state)
+                && last_perm_check.elapsed() >= PERMISSION_CHECK_INTERVAL
+            {
+                last_perm_check = Instant::now();
+                if check_permissions(&mut state) {
+                    tray.rebuild(&state);
+                }
+            }
         }
 
         if let Ok(menu_event) = menu_channel.try_recv()
@@ -118,7 +141,9 @@ fn main() {
             );
         }
 
-        *control_flow = if state.recording_state != RecordingState::Idle {
+        *control_flow = if state.recording_state != RecordingState::Idle
+            || !all_permissions_granted(&state)
+        {
             ControlFlow::WaitUntil(Instant::now() + ANIMATION_INTERVAL)
         } else {
             ControlFlow::Wait
@@ -138,7 +163,15 @@ fn handle_event(
     match event {
         AppEvent::HotkeyPressed => {
             if state.recording_state != RecordingState::Idle {
-                eprintln!("[murmur] hotkey pressed but busy ({:?})", state.recording_state);
+                eprintln!(
+                    "[murmur] hotkey pressed but busy ({:?})",
+                    state.recording_state
+                );
+                return;
+            }
+            if !state.permissions.microphone {
+                platform::play_stop_sound();
+                eprintln!("[murmur] microphone permission not granted");
                 return;
             }
             match audio.start() {
@@ -169,14 +202,18 @@ fn handle_event(
             eprintln!("[murmur] \"{text}\"");
             if let Err(e) = clipboard.set_text(&text) {
                 eprintln!("[murmur] error: clipboard: {e}");
-            } else if state.config.output_mode == OutputMode::PasteAtCursor
-                && let Ok(mut enigo) = Enigo::new(&Settings::default())
-            {
-                std::thread::sleep(std::time::Duration::from_millis(50));
-                let modifier = platform::paste_modifier();
-                let _ = enigo.key(modifier, Direction::Press);
-                let _ = enigo.key(Key::Unicode('v'), Direction::Click);
-                let _ = enigo.key(modifier, Direction::Release);
+            } else if state.config.output_mode == OutputMode::PasteAtCursor {
+                if state.permissions.accessibility {
+                    if let Ok(mut enigo) = Enigo::new(&Settings::default()) {
+                        std::thread::sleep(std::time::Duration::from_millis(50));
+                        let modifier = platform::paste_modifier();
+                        let _ = enigo.key(modifier, Direction::Press);
+                        let _ = enigo.key(Key::Unicode('v'), Direction::Click);
+                        let _ = enigo.key(modifier, Direction::Release);
+                    }
+                } else {
+                    eprintln!("[murmur] paste skipped: accessibility not granted (text is in clipboard)");
+                }
             }
             state.recording_state = RecordingState::Idle;
             tray.rebuild(state);

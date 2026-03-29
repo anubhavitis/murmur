@@ -157,6 +157,22 @@ impl Tray {
         };
         let status = MenuItem::new(status_text, false, None);
         menu.append(&status).unwrap();
+
+        // Permission warnings (only shown when missing)
+        let needs_setup = !state.permissions.microphone || !state.permissions.accessibility;
+        if needs_setup {
+            menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
+                .unwrap();
+            if !state.permissions.microphone {
+                let item = MenuItem::new("⚠ Microphone: grant permission", false, None);
+                menu.append(&item).unwrap();
+            }
+            if !state.permissions.accessibility {
+                let item = MenuItem::new("⚠ Accessibility: grant permission", false, None);
+                menu.append(&item).unwrap();
+            }
+        }
+
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
 

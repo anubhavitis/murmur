@@ -17,10 +17,15 @@ pub fn play_stop_sound() {
         .spawn();
 }
 
+pub fn check_microphone() -> bool {
+    true
+}
+
 pub fn check_accessibility() -> bool {
     true
 }
 
+pub fn prompt_microphone() {}
 pub fn prompt_accessibility() {}
 pub fn prompt_input_monitoring() {}
 pub fn self_restart() -> ! {

@@ -21,8 +21,28 @@ pub fn play_stop_sound() {
         .spawn();
 }
 
+pub fn check_microphone() -> bool {
+    use cpal::traits::HostTrait;
+    cpal::default_host().default_input_device().is_some()
+}
+
 pub fn check_accessibility() -> bool {
     unsafe { AXIsProcessTrusted() }
+}
+
+pub fn prompt_microphone() {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    if let Some(device) = host.default_input_device()
+        && let Ok(config) = device.default_input_config()
+    {
+        let _ = device.build_input_stream(
+            &config.into(),
+            |_: &[f32], _: &cpal::InputCallbackInfo| {},
+            |_| {},
+            None,
+        );
+    }
 }
 
 pub fn prompt_accessibility() {

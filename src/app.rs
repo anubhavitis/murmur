@@ -28,12 +28,21 @@ pub enum RecordingState {
     Transcribing,
 }
 
+#[derive(Debug, Default)]
+pub struct Permissions {
+    pub microphone: bool,
+    pub accessibility: bool,
+    pub prompted_mic: bool,
+    pub prompted_accessibility: bool,
+}
+
 #[derive(Debug)]
 pub struct AppState {
     pub config: Config,
     pub recording_state: RecordingState,
     pub download_progress: Option<(String, u8)>,
     pub installed_models: Vec<String>,
+    pub permissions: Permissions,
 }
 
 impl AppState {
@@ -44,6 +53,7 @@ impl AppState {
             recording_state: RecordingState::Idle,
             download_progress: None,
             installed_models,
+            permissions: Permissions::default(),
         }
     }
 
