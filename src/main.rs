@@ -77,7 +77,15 @@ fn main() {
     rotate_log();
     eprintln!("[murmur] starting...");
 
-    let config = Config::load();
+    let mut config = Config::load();
+    // Clean up unsupported languages for the current tier
+    config
+        .languages
+        .retain(|l| languages::is_supported_on_tier(l, &config.selected_tier));
+    if config.languages.is_empty() {
+        config.languages.push("en".to_string());
+    }
+    config.save();
     let mut state = AppState::new(config);
     let mut audio = AudioCapture::new();
 
