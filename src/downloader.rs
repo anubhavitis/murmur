@@ -61,24 +61,25 @@ pub fn spawn_upgrade(proxy: EventLoopProxy<AppEvent>, model: String) {
 fn download_model_blocking(model: &str, dest: &PathBuf) -> Result<(), String> {
     let url = format!("{HF_BASE}/ggml-{model}.bin");
 
-    let response = reqwest::blocking::get(&url)
-        .map_err(|e| format!("download request failed: {e}"))?;
+    let response =
+        reqwest::blocking::get(&url).map_err(|e| format!("download request failed: {e}"))?;
 
     if !response.status().is_success() {
         return Err(format!("download failed: HTTP {}", response.status()));
     }
 
-    let bytes = response.bytes().map_err(|e| format!("failed to read response: {e}"))?;
+    let bytes = response
+        .bytes()
+        .map_err(|e| format!("failed to read response: {e}"))?;
 
     let tmp_path = dest.with_extension("bin.tmp");
-    let mut file = fs::File::create(&tmp_path)
-        .map_err(|e| format!("failed to create temp file: {e}"))?;
+    let mut file =
+        fs::File::create(&tmp_path).map_err(|e| format!("failed to create temp file: {e}"))?;
     file.write_all(&bytes)
         .map_err(|e| format!("failed to write model: {e}"))?;
 
     let _ = fs::remove_file(dest);
-    fs::rename(&tmp_path, dest)
-        .map_err(|e| format!("failed to rename temp file: {e}"))?;
+    fs::rename(&tmp_path, dest).map_err(|e| format!("failed to rename temp file: {e}"))?;
 
     Ok(())
 }
@@ -90,8 +91,8 @@ fn download_model_streaming(
 ) -> Result<(), String> {
     let url = format!("{HF_BASE}/ggml-{model}.bin");
 
-    let response = reqwest::blocking::get(&url)
-        .map_err(|e| format!("download request failed: {e}"))?;
+    let response =
+        reqwest::blocking::get(&url).map_err(|e| format!("download request failed: {e}"))?;
 
     if !response.status().is_success() {
         return Err(format!("HTTP {}", response.status()));
@@ -100,15 +101,17 @@ fn download_model_streaming(
     let total = response.content_length().unwrap_or(0);
     let mut reader = response;
     let tmp_path = dest.with_extension("bin.tmp");
-    let mut file = fs::File::create(&tmp_path)
-        .map_err(|e| format!("failed to create temp file: {e}"))?;
+    let mut file =
+        fs::File::create(&tmp_path).map_err(|e| format!("failed to create temp file: {e}"))?;
 
     let mut downloaded: u64 = 0;
     let mut last_pct: u8 = 0;
     let mut buf = [0u8; 65536];
 
     loop {
-        let n = reader.read(&mut buf).map_err(|e| format!("read error: {e}"))?;
+        let n = reader
+            .read(&mut buf)
+            .map_err(|e| format!("read error: {e}"))?;
         if n == 0 {
             break;
         }
@@ -126,8 +129,7 @@ fn download_model_streaming(
     }
 
     let _ = fs::remove_file(dest);
-    fs::rename(&tmp_path, dest)
-        .map_err(|e| format!("failed to rename temp file: {e}"))?;
+    fs::rename(&tmp_path, dest).map_err(|e| format!("failed to rename temp file: {e}"))?;
 
     Ok(())
 }

@@ -1,11 +1,11 @@
-use image::imageops::FilterType;
 use image::RgbaImage;
+use image::imageops::FilterType;
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, Submenu};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
 use crate::config::{HotkeyChoice, OutputMode, Tier};
-use crate::languages::{is_supported_on_tier, LANGUAGES};
+use crate::languages::{LANGUAGES, is_supported_on_tier};
 
 const FRAME_COUNT: usize = 36;
 const ICON_SIZE: u32 = 44;
@@ -123,7 +123,9 @@ impl Tray {
 
     pub fn advance_frame(&mut self) {
         self.frame_index = (self.frame_index + 1) % FRAME_COUNT;
-        let _ = self.icon.set_icon(Some(self.frames[self.frame_index].clone()));
+        let _ = self
+            .icon
+            .set_icon(Some(self.frames[self.frame_index].clone()));
     }
 
     pub fn reset_icon(&mut self) {
@@ -192,12 +194,8 @@ impl Tray {
 
         // Quality tier
         let tier_sub = Submenu::new("Quality", true);
-        let tier_fast = CheckMenuItem::new(
-            "Fast",
-            true,
-            state.config.selected_tier == Tier::Fast,
-            None,
-        );
+        let tier_fast =
+            CheckMenuItem::new("Fast", true, state.config.selected_tier == Tier::Fast, None);
         let tier_standard = CheckMenuItem::new(
             "Standard",
             true,

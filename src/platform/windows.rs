@@ -7,7 +7,10 @@ pub fn paste_modifier() -> Key {
 
 pub fn play_start_sound() {
     let _ = Command::new("powershell")
-        .args(["-Command", "[System.Media.SystemSounds]::Exclamation.Play()"])
+        .args([
+            "-Command",
+            "[System.Media.SystemSounds]::Exclamation.Play()",
+        ])
         .spawn();
 }
 

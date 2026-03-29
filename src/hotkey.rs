@@ -1,6 +1,6 @@
-use rdev::{listen, Event, EventType, Key};
-use std::sync::atomic::{AtomicU64, Ordering};
+use rdev::{Event, EventType, Key, listen};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tao::event_loop::EventLoopProxy;
@@ -29,26 +29,24 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
     let press_time = Arc::new(AtomicU64::new(0));
 
     thread::spawn(move || {
-        let result = listen(move |event: Event| {
-            match event.event_type {
-                EventType::KeyPress(k) if k == key => {
-                    let last = press_time.load(Ordering::SeqCst);
-                    let now = now_ms();
-                    let stale = last > 0 && (now - last) > STALE_THRESHOLD_MS;
+        let result = listen(move |event: Event| match event.event_type {
+            EventType::KeyPress(k) if k == key => {
+                let last = press_time.load(Ordering::SeqCst);
+                let now = now_ms();
+                let stale = last > 0 && (now - last) > STALE_THRESHOLD_MS;
 
-                    if last == 0 || stale {
-                        press_time.store(now, Ordering::SeqCst);
-                        let _ = proxy.send_event(AppEvent::HotkeyPressed);
-                    }
+                if last == 0 || stale {
+                    press_time.store(now, Ordering::SeqCst);
+                    let _ = proxy.send_event(AppEvent::HotkeyPressed);
                 }
-                EventType::KeyRelease(k) if k == key => {
-                    if press_time.load(Ordering::SeqCst) > 0 {
-                        press_time.store(0, Ordering::SeqCst);
-                        let _ = proxy.send_event(AppEvent::HotkeyReleased);
-                    }
-                }
-                _ => {}
             }
+            EventType::KeyRelease(k) if k == key => {
+                if press_time.load(Ordering::SeqCst) > 0 {
+                    press_time.store(0, Ordering::SeqCst);
+                    let _ = proxy.send_event(AppEvent::HotkeyReleased);
+                }
+            }
+            _ => {}
         });
         if let Err(e) = result {
             eprintln!("[murmur] hotkey listener failed: {e:?}");
@@ -62,10 +60,15 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
                 return;
             }
             crate::platform::prompt_input_monitoring();
-            eprintln!("[murmur] waiting for input monitoring (attempt {})...", retries + 1);
+            eprintln!(
+                "[murmur] waiting for input monitoring (attempt {})...",
+                retries + 1
+            );
             std::thread::sleep(std::time::Duration::from_secs(10));
             // SAFETY: only this thread runs at this point, self_restart replaces process immediately
-            unsafe { std::env::set_var("MURMUR_HOTKEY_RETRIES", (retries + 1).to_string()); }
+            unsafe {
+                std::env::set_var("MURMUR_HOTKEY_RETRIES", (retries + 1).to_string());
+            }
             crate::platform::self_restart();
         }
     });

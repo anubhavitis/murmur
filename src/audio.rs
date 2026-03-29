@@ -1,5 +1,5 @@
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::Stream;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -66,7 +66,9 @@ impl AudioCapture {
             )
             .map_err(|e| format!("failed to build input stream: {e}"))?;
 
-        stream.play().map_err(|e| format!("failed to start stream: {e}"))?;
+        stream
+            .play()
+            .map_err(|e| format!("failed to start stream: {e}"))?;
         self.stream = Some(stream);
         Ok(())
     }

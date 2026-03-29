@@ -56,7 +56,10 @@ fn check_permissions(state: &mut AppState) -> bool {
     if !state.permissions.microphone && !state.permissions.prompted_mic {
         platform::prompt_microphone();
         state.permissions.prompted_mic = true;
-    } else if state.permissions.microphone && !state.permissions.accessibility && !state.permissions.prompted_accessibility {
+    } else if state.permissions.microphone
+        && !state.permissions.accessibility
+        && !state.permissions.prompted_accessibility
+    {
         platform::prompt_accessibility();
         state.permissions.prompted_accessibility = true;
     }
@@ -138,13 +141,12 @@ fn main() {
             );
         }
 
-        *control_flow = if state.recording_state != RecordingState::Idle
-            || !all_permissions_granted(&state)
-        {
-            ControlFlow::WaitUntil(Instant::now() + ANIMATION_INTERVAL)
-        } else {
-            ControlFlow::Wait
-        };
+        *control_flow =
+            if state.recording_state != RecordingState::Idle || !all_permissions_granted(&state) {
+                ControlFlow::WaitUntil(Instant::now() + ANIMATION_INTERVAL)
+            } else {
+                ControlFlow::Wait
+            };
     });
 }
 
@@ -213,7 +215,9 @@ fn handle_event(
                         let _ = enigo.key(modifier, Direction::Release);
                     }
                 } else {
-                    eprintln!("[murmur] paste skipped: accessibility not granted (text is in clipboard)");
+                    eprintln!(
+                        "[murmur] paste skipped: accessibility not granted (text is in clipboard)"
+                    );
                 }
             }
             state.recording_state = RecordingState::Idle;
@@ -225,10 +229,7 @@ fn handle_event(
             tray.rebuild(state);
 
             // Check if we need to upgrade from bootstrap model
-            let target = resolve_backend(
-                &state.config.selected_tier,
-                &state.config.languages,
-            );
+            let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             let bootstrap = BackendChoice::Whisper(BOOTSTRAP_MODEL.to_string());
             if target != bootstrap && !state.upgrading_backend {
                 match &target {
@@ -238,10 +239,7 @@ fn handle_event(
                         } else {
                             eprintln!("[murmur] background download: {model}");
                             state.upgrading_backend = true;
-                            downloader::spawn_upgrade(
-                                download_proxy.clone(),
-                                model.clone(),
-                            );
+                            downloader::spawn_upgrade(download_proxy.clone(), model.clone());
                         }
                     }
                     #[cfg(feature = "fluid_audio")]
@@ -274,10 +272,7 @@ fn handle_event(
             tray.rebuild(state);
         }
         AppEvent::BackendUpgradeReady => {
-            let target = resolve_backend(
-                &state.config.selected_tier,
-                &state.config.languages,
-            );
+            let target = resolve_backend(&state.config.selected_tier, &state.config.languages);
             eprintln!("[murmur] upgrading backend to {target:?}");
             state.transcriber_ready = false;
             state.upgrading_backend = false;

@@ -37,9 +37,7 @@ pub fn resolve_backend(tier: &Tier, languages: &[String]) -> BackendChoice {
             let _ = all_supported;
             BackendChoice::Whisper(tier.whisper_model().to_string())
         }
-        Tier::Standard | Tier::Accurate => {
-            BackendChoice::Whisper(tier.whisper_model().to_string())
-        }
+        Tier::Standard | Tier::Accurate => BackendChoice::Whisper(tier.whisper_model().to_string()),
     }
 }
 
@@ -67,10 +65,11 @@ impl Transcriber {
         let thread_proxy = proxy.clone();
 
         thread::spawn(move || {
-            let mut backend: Box<dyn TranscriptionBackend> = match Self::create_backend(&choice, &thread_proxy) {
-                Some(b) => b,
-                None => return,
-            };
+            let mut backend: Box<dyn TranscriptionBackend> =
+                match Self::create_backend(&choice, &thread_proxy) {
+                    Some(b) => b,
+                    None => return,
+                };
 
             let _ = thread_proxy.send_event(AppEvent::TranscriberReady);
 
@@ -99,9 +98,9 @@ impl Transcriber {
                 let model_path = match downloader::ensure_model(model) {
                     Ok(p) => p,
                     Err(e) => {
-                        let _ = proxy.send_event(AppEvent::TranscriptionError(
-                            format!("model load failed: {e}"),
-                        ));
+                        let _ = proxy.send_event(AppEvent::TranscriptionError(format!(
+                            "model load failed: {e}"
+                        )));
                         return None;
                     }
                 };
@@ -134,10 +133,7 @@ impl Transcriber {
                     Err(e) => {
                         eprintln!("[murmur] FluidAudio failed: {e}, falling back to Whisper");
                         // Fallback to Whisper small
-                        Self::create_backend(
-                            &BackendChoice::Whisper("small".to_string()),
-                            proxy,
-                        )
+                        Self::create_backend(&BackendChoice::Whisper("small".to_string()), proxy)
                     }
                 }
             }
@@ -150,11 +146,9 @@ impl Transcriber {
             .send(TranscribeRequest { samples, languages })
             .is_err()
         {
-            let _ = self
-                .proxy
-                .send_event(AppEvent::TranscriptionError(
-                    "transcriber unavailable".to_string(),
-                ));
+            let _ = self.proxy.send_event(AppEvent::TranscriptionError(
+                "transcriber unavailable".to_string(),
+            ));
         }
     }
 }
