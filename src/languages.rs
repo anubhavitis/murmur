@@ -1,6 +1,20 @@
+use crate::config::Tier;
+
 pub struct Language {
     pub code: &'static str,
     pub name: &'static str,
+}
+
+pub const PARAKEET_LANGUAGES: &[&str] = &[
+    "bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "lv", "lt",
+    "mt", "pl", "pt", "ro", "ru", "sk", "sl", "es", "sv", "uk",
+];
+
+pub fn is_supported_on_tier(code: &str, tier: &Tier) -> bool {
+    match tier {
+        Tier::Fast => PARAKEET_LANGUAGES.contains(&code),
+        Tier::Standard | Tier::Accurate => true,
+    }
 }
 
 pub const LANGUAGES: &[Language] = &[

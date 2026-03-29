@@ -24,6 +24,7 @@ pub fn ensure_model(model: &str) -> Result<PathBuf, String> {
     Ok(path)
 }
 
+#[allow(dead_code)]
 pub fn spawn_download(proxy: EventLoopProxy<AppEvent>, model: String) {
     thread::spawn(move || {
         let path = model_path(&model);

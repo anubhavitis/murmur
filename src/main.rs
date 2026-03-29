@@ -238,7 +238,6 @@ fn handle_event(
         }
         AppEvent::ModelDownloadComplete(_model) => {
             state.download_progress = None;
-            state.refresh_models();
             state.config.save();
             tray.rebuild(state);
         }
@@ -253,7 +252,7 @@ fn handle_menu_command(
     cmd: MenuCommand,
     state: &mut AppState,
     tray: &mut Tray,
-    proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
+    _proxy: &tao::event_loop::EventLoopProxy<AppEvent>,
 ) {
     match cmd {
         MenuCommand::SetOutputMode(mode) => {
@@ -266,19 +265,10 @@ fn handle_menu_command(
             state.config.save();
             platform::self_restart();
         }
-        MenuCommand::SelectModel(model) => {
-            state.config.selected_tier = config::Tier::Fast;
-            let _ = model;
+        MenuCommand::SetTier(tier) => {
+            state.config.selected_tier = tier;
             state.config.save();
-            tray.rebuild(state);
-        }
-        MenuCommand::DownloadModel(model) => {
-            if state.download_progress.is_some() {
-                return;
-            }
-            state.download_progress = Some((model.clone(), 0));
-            tray.rebuild(state);
-            downloader::spawn_download(proxy.clone(), model);
+            platform::self_restart();
         }
         MenuCommand::ToggleLanguage(code) => {
             if code == "en" {

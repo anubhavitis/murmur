@@ -4,21 +4,9 @@ use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, Submenu}
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 use crate::app::{AppEvent, AppState, MenuCommand, RecordingState};
-use crate::config::{HotkeyChoice, OutputMode};
-use crate::languages::LANGUAGES;
+use crate::config::{HotkeyChoice, OutputMode, Tier};
+use crate::languages::{is_supported_on_tier, LANGUAGES};
 
-// (display_name, file_name, size)
-const MODEL_REGISTRY: &[(&str, &str, &str)] = &[
-    ("tiny (english)", "tiny.en", "74 MB"),
-    ("tiny (multilingual)", "tiny", "74 MB"),
-    ("base (english)", "base.en", "141 MB"),
-    ("base (multilingual)", "base", "141 MB"),
-    ("small (english)", "small.en", "465 MB"),
-    ("small (multilingual)", "small", "465 MB"),
-    ("medium (english)", "medium.en", "1.4 GB"),
-    ("medium (multilingual)", "medium", "1.4 GB"),
-    ("large (multilingual)", "large-v3", "2.9 GB"),
-];
 const FRAME_COUNT: usize = 36;
 const ICON_SIZE: u32 = 44;
 
@@ -27,7 +15,9 @@ struct MenuIds {
     output_paste: MenuId,
     hotkey_right_alt: MenuId,
     hotkey_caps_lock: MenuId,
-    model_items: Vec<(String, MenuId)>,
+    tier_fast: MenuId,
+    tier_standard: MenuId,
+    tier_accurate: MenuId,
     language_items: Vec<(String, MenuId)>,
     progress_item: Option<MenuItem>,
     website: MenuId,
@@ -200,61 +190,103 @@ impl Tray {
         hotkey_sub.append(&hotkey_caps_lock).unwrap();
         menu.append(&hotkey_sub).unwrap();
 
+        // Quality tier
+        let tier_sub = Submenu::new("Quality", true);
+        let tier_fast = CheckMenuItem::new(
+            "Fast",
+            true,
+            state.config.selected_tier == Tier::Fast,
+            None,
+        );
+        let tier_standard = CheckMenuItem::new(
+            "Standard",
+            true,
+            state.config.selected_tier == Tier::Standard,
+            None,
+        );
+        let tier_accurate = CheckMenuItem::new(
+            "Accurate",
+            true,
+            state.config.selected_tier == Tier::Accurate,
+            None,
+        );
+        let tier_fast_id = tier_fast.id().clone();
+        let tier_standard_id = tier_standard.id().clone();
+        let tier_accurate_id = tier_accurate.id().clone();
+        tier_sub.append(&tier_fast).unwrap();
+        tier_sub.append(&tier_standard).unwrap();
+        tier_sub.append(&tier_accurate).unwrap();
+        menu.append(&tier_sub).unwrap();
+
         // Languages
         let lang_sub = Submenu::new("Languages", true);
         let mut language_items = Vec::new();
+        let tier = &state.config.selected_tier;
 
         // Selected languages (toggleable)
         for lang in LANGUAGES {
-            let selected = state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
+            let selected =
+                state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
             if !selected {
                 continue;
             }
-            let enabled = lang.code != "en";
+            let supported = is_supported_on_tier(lang.code, tier);
+            let enabled = lang.code != "en" && supported;
             let item = CheckMenuItem::new(lang.name, enabled, true, None);
             language_items.push((lang.code.to_string(), item.id().clone()));
             lang_sub.append(&item).unwrap();
         }
 
-        lang_sub.append(&tray_icon::menu::PredefinedMenuItem::separator()).unwrap();
+        lang_sub
+            .append(&tray_icon::menu::PredefinedMenuItem::separator())
+            .unwrap();
         let add_sub = Submenu::new("Add language...", true);
 
+        // Supported but not selected
+        let mut has_unsupported = false;
         for lang in LANGUAGES {
-            let selected = state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
+            let selected =
+                state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
             if selected {
+                continue;
+            }
+            if !is_supported_on_tier(lang.code, tier) {
+                has_unsupported = true;
                 continue;
             }
             let item = CheckMenuItem::new(lang.name, true, false, None);
             language_items.push((lang.code.to_string(), item.id().clone()));
             add_sub.append(&item).unwrap();
         }
+
+        // Unsupported languages (grayed out with separator)
+        if has_unsupported {
+            add_sub
+                .append(&tray_icon::menu::PredefinedMenuItem::separator())
+                .unwrap();
+            let notice = MenuItem::new(
+                format!("Not available on {} tier", tier.display_name()),
+                false,
+                None,
+            );
+            add_sub.append(&notice).unwrap();
+
+            for lang in LANGUAGES {
+                let selected =
+                    state.config.languages.contains(&lang.code.to_string()) || lang.code == "en";
+                if selected || is_supported_on_tier(lang.code, tier) {
+                    continue;
+                }
+                let item = MenuItem::new(lang.name, false, None);
+                add_sub.append(&item).unwrap();
+            }
+        }
+
         lang_sub.append(&add_sub).unwrap();
         menu.append(&lang_sub).unwrap();
 
         menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
             .unwrap();
-
-        let current_model = MenuItem::new(
-            format!("Quality: {}", state.config.selected_tier.display_name()),
-            false,
-            None,
-        );
-        menu.append(&current_model).unwrap();
-
-        let model_sub = Submenu::new("Change Model", true);
-        let mut model_items = Vec::new();
-        for &(display_name, file_name, size) in MODEL_REGISTRY {
-            let installed = state.installed_models.contains(&file_name.to_string());
-            let label = if installed {
-                format!("  {display_name}")
-            } else {
-                format!("⬇ {display_name}  ({size})")
-            };
-            let item = MenuItem::new(label, true, None);
-            model_items.push((file_name.to_string(), item.id().clone()));
-            model_sub.append(&item).unwrap();
-        }
-        menu.append(&model_sub).unwrap();
 
         let progress_item = if let Some((ref name, pct)) = state.download_progress {
             menu.append(&tray_icon::menu::PredefinedMenuItem::separator())
@@ -286,7 +318,9 @@ impl Tray {
             output_paste: output_paste_id,
             hotkey_right_alt: hotkey_right_alt_id,
             hotkey_caps_lock: hotkey_caps_lock_id,
-            model_items,
+            tier_fast: tier_fast_id,
+            tier_standard: tier_standard_id,
+            tier_accurate: tier_accurate_id,
             language_items,
             progress_item,
             website: website_id,
@@ -295,7 +329,7 @@ impl Tray {
         (menu, ids)
     }
 
-    pub fn handle_menu_event(&self, event: &MenuEvent, state: &AppState) -> Option<AppEvent> {
+    pub fn handle_menu_event(&self, event: &MenuEvent, _state: &AppState) -> Option<AppEvent> {
         let id = &event.id;
 
         if *id == self.ids.quit {
@@ -328,16 +362,14 @@ impl Tray {
             )));
         }
 
-        for (model_name, menu_id) in &self.ids.model_items {
-            if id == menu_id {
-                if state.installed_models.contains(model_name) {
-                    return Some(AppEvent::Menu(MenuCommand::SelectModel(model_name.clone())));
-                } else {
-                    return Some(AppEvent::Menu(MenuCommand::DownloadModel(
-                        model_name.clone(),
-                    )));
-                }
-            }
+        if *id == self.ids.tier_fast {
+            return Some(AppEvent::Menu(MenuCommand::SetTier(Tier::Fast)));
+        }
+        if *id == self.ids.tier_standard {
+            return Some(AppEvent::Menu(MenuCommand::SetTier(Tier::Standard)));
+        }
+        if *id == self.ids.tier_accurate {
+            return Some(AppEvent::Menu(MenuCommand::SetTier(Tier::Accurate)));
         }
 
         for (lang_code, menu_id) in &self.ids.language_items {
