@@ -14,6 +14,10 @@
   <img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust">
   <img src="https://img.shields.io/badge/powered_by-whisper.cpp_+_FluidAudio-green" alt="whisper.cpp + FluidAudio">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
+  <br>
+  <img src="https://img.shields.io/badge/coming_soon-Live_Transcription-yellow" alt="Coming Soon: Live Transcription">
+  <img src="https://img.shields.io/badge/coming_soon-Windows-yellow" alt="Coming Soon: Windows">
+  <img src="https://img.shields.io/badge/coming_soon-Linux-yellow" alt="Coming Soon: Linux">
 </p>
 
 ---
