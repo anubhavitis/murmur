@@ -12,7 +12,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/platform-macOS_(Apple_Silicon)-blue" alt="macOS">
   <img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust">
-  <img src="https://img.shields.io/badge/powered_by-whisper.cpp-green" alt="whisper.cpp">
+  <img src="https://img.shields.io/badge/powered_by-whisper.cpp_+_FluidAudio-green" alt="whisper.cpp + FluidAudio">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
 </p>
 
@@ -24,7 +24,7 @@
 2. **Speak**
 3. **Release** — text appears in your clipboard (or pastes at cursor)
 
-That's it. No cloud. No API keys. Everything runs locally on your machine via [whisper.cpp](https://github.com/ggerganov/whisper.cpp).
+That's it. No cloud. No API keys. Everything runs locally on your machine via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) or [FluidAudio](https://www.fluidaudio.net/) (Apple Neural Engine).
 
 ---
 
@@ -57,6 +57,22 @@ After install, grant these in **System Settings > Privacy & Security**:
 
 Look for `murmur` in each permission list and toggle it on.
 
+> **Note:** Murmur is not notarized yet (Apple charges $99/year and we're spending all our money on coffee instead). Because of this, macOS may reset permissions when you update. If the hotkey stops working after an upgrade, you'll need to re-grant permissions — see [Upgrading](#upgrading) below.
+
+### Upgrading
+
+```sh
+brew update && brew upgrade --cask murmur
+```
+
+Since Murmur is not notarized, macOS treats each update as a new app and **resets all permissions**. After upgrading:
+
+1. Open **System Settings > Privacy & Security**
+2. Remove the old `murmur` entry from Input Monitoring, Microphone, and Accessibility
+3. Re-add and enable the new one
+
+We know this is painful. Apple charges $99/year to make this go away — contributions welcome so we can stop making you click through permission dialogs like it's 2005.
+
 ### Uninstall
 
 ```sh
@@ -71,50 +87,26 @@ curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/uninstall.sh
 |---|---|
 | **Menubar app** | Lives in your system tray, zero windows |
 | **Hold-to-record** | Right Option or Caps Lock as trigger |
-| **Fully offline** | whisper.cpp runs locally, no data leaves your machine |
-| **Auto-download** | Grabs the `tiny.en` model on first launch |
+| **Fully offline** | No data leaves your machine |
+| **Tier system** | Fast, Standard, Accurate — pick your quality/speed tradeoff |
+| **Dual backends** | whisper.cpp + FluidAudio (Apple Neural Engine) |
+| **Zero-downtime upgrades** | Two-slot transcriber swaps backends without interruption |
+| **Auto-download** | Bootstraps with `tiny.en` (~74 MB), upgrades to tier model in background |
 | **Clipboard or paste** | Copy to clipboard, or paste directly at cursor |
-| **Model selection** | English and multilingual variants: tiny through large |
-| **Language preferences** | Pick preferred languages, auto-detect among them |
+| **100+ languages** | Pick preferred languages, auto-detect among them |
 | **Audio feedback** | Beep on record start/stop |
 | **Animated icon** | Tray icon spins while recording and transcribing |
 | **Auto-start** | Launches on login via Launch Agent |
 
 ---
 
-## Models
+## Tiers
 
-| Model | English | Multilingual | Size |
-|---|---|---|---|
-| tiny | tiny.en | tiny | 74 MB |
-| base | base.en | base | 141 MB |
-| small | small.en | small | 465 MB |
-| medium | medium.en | medium | 1.4 GB |
-| large | — | large-v3 | 2.9 GB |
-
-Models are downloaded from [HuggingFace](https://huggingface.co/ggerganov/whisper.cpp) and stored at `~/.murmur/models/`.
-
----
-
-## Configuration
-
-Config lives at `~/.murmur/config.json`:
-
-```json
-{
-  "selected_model": "tiny.en",
-  "output_mode": "paste_at_cursor",
-  "hotkey": "right_alt",
-  "languages": ["en"]
-}
-```
-
-| Setting | Options |
-|---|---|
-| `output_mode` | `clipboard`, `paste_at_cursor` |
-| `hotkey` | `right_alt`, `caps_lock` |
-| `selected_model` | Any model from the table above |
-| `languages` | Array of [whisper language codes](https://github.com/openai/whisper/blob/main/whisper/tokenizer.py) (e.g. `["en", "hi"]`) |
+| Tier | Best for |
+| --- | --- |
+| **Fast** | Low latency, real-time |
+| **Standard** | Balanced accuracy and speed |
+| **Accurate** | Highest accuracy, multilingual |
 
 ---
 
@@ -154,32 +146,8 @@ Builds the binary, creates a tar.gz, generates the Homebrew cask formula, and pr
 
 ---
 
-## Architecture
-
-```
-src/
-  main.rs         Event loop, wires everything together
-  app.rs          State, events, menu commands
-  config.rs       Config persistence (~/.murmur/config.json)
-  tray.rs         Menubar tray icon, menu, animation
-  hotkey.rs       Global hotkey listener (rdev)
-  audio.rs        Audio capture + 16kHz resampling (cpal)
-  transcriber.rs  Whisper inference on background thread
-  downloader.rs   Model download from HuggingFace
-  languages.rs    Whisper language registry (100 languages)
-  platform/       OS-specific code (paste key, sounds)
-```
-
----
-
 ## Roadmap
 
 - [ ] Live transcription (streaming partial results while recording)
 - [ ] Windows support (code is cross-platform ready, untested)
-- [ ] CoreML backend for Apple Silicon
 
----
-
-## License
-
-MIT
