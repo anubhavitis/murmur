@@ -56,7 +56,12 @@ pub fn spawn_listener(proxy: EventLoopProxy<AppEvent>, hotkey_choice: HotkeyChoi
                 .unwrap_or(0);
             if retries >= 3 {
                 eprintln!("[murmur] hotkey listener failed after 3 attempts, giving up");
+                #[cfg(target_os = "macos")]
                 eprintln!("[murmur] grant Input Monitoring in System Settings and restart");
+                #[cfg(target_os = "windows")]
+                eprintln!(
+                    "[murmur] global hotkey listener failed; check Windows privacy or security settings and restart"
+                );
                 return;
             }
             crate::platform::prompt_input_monitoring();

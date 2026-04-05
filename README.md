@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-macOS_(Apple_Silicon)-blue" alt="macOS">
+  <img src="https://img.shields.io/badge/platform-macOS-blue" alt="macOS">
+  <img src="https://img.shields.io/badge/platform-Windows-blue" alt="Windows">
   <img src="https://img.shields.io/badge/language-Rust-orange" alt="Rust">
   <img src="https://img.shields.io/badge/powered_by-whisper.cpp_+_FluidAudio-green" alt="whisper.cpp + FluidAudio">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
   <br>
   <img src="https://img.shields.io/badge/coming_soon-Live_Transcription-yellow" alt="Coming Soon: Live Transcription">
-  <img src="https://img.shields.io/badge/coming_soon-Windows-yellow" alt="Coming Soon: Windows">
   <img src="https://img.shields.io/badge/coming_soon-Linux-yellow" alt="Coming Soon: Linux">
 </p>
 
@@ -24,15 +24,25 @@
 
 ## How it works
 
-1. **Hold** Right Option key
+1. **Hold** Right Option (macOS) or Right Alt (Windows)
 2. **Speak**
 3. **Release** — text appears in your clipboard (or pastes at cursor)
 
-That's it. No cloud. No API keys. Everything runs locally on your machine via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) or [FluidAudio](https://www.fluidaudio.net/) (Apple Neural Engine).
+That's it. No cloud. No API keys. Everything runs locally on your machine via [whisper.cpp](https://github.com/ggerganov/whisper.cpp) or [FluidAudio](https://www.fluidaudio.net/) (Apple Neural Engine on Apple Silicon Macs).
 
 ---
 
 ## Install
+
+### Windows
+
+There is no Windows installer yet. Build from source on a Windows machine:
+
+```powershell
+git clone https://github.com/anubhavitis/murmur.git
+cd murmur
+cargo run --release
+```
 
 ### Homebrew (recommended)
 
@@ -90,17 +100,17 @@ curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/uninstall.sh
 | Feature | Description |
 |---|---|
 | **Menubar app** | Lives in your system tray, zero windows |
-| **Hold-to-record** | Right Option or Caps Lock as trigger |
+| **Hold-to-record** | Right Option on macOS, Right Alt on Windows, or Caps Lock |
 | **Fully offline** | No data leaves your machine |
 | **Tier system** | Fast, Standard, Accurate — pick your quality/speed tradeoff |
-| **Dual backends** | whisper.cpp + FluidAudio (Apple Neural Engine) |
+| **Dual backends** | whisper.cpp everywhere, FluidAudio on Apple Silicon Macs |
 | **Zero-downtime upgrades** | Two-slot transcriber swaps backends without interruption |
 | **Auto-download** | Bootstraps with `tiny.en` (~74 MB), upgrades to tier model in background |
-| **Clipboard or paste** | Copy to clipboard, or paste directly at cursor |
+| **Clipboard or paste** | Copy to clipboard, or paste directly at cursor using `Cmd+V` or `Ctrl+V` |
 | **100+ languages** | Pick preferred languages, auto-detect among them |
 | **Audio feedback** | Beep on record start/stop |
 | **Animated icon** | Tray icon spins while recording and transcribing |
-| **Auto-start** | Launches on login via Launch Agent |
+| **Auto-start** | macOS Launch Agent today; Windows packaging is zip-based for now |
 
 ---
 
@@ -121,11 +131,11 @@ curl -sSL https://raw.githubusercontent.com/anubhavitis/murmur/main/uninstall.sh
 
 ### Requirements
 
-| Requirement | macOS |
-|---|---|
-| Rust 1.85+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
-| cmake | `brew install cmake` |
-| C compiler | Included with Xcode CLT (`xcode-select --install`) |
+| Requirement | macOS | Windows |
+|---|---|---|
+| Rust 1.85+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` | `winget install Rustlang.Rustup` |
+| cmake | `brew install cmake` | `winget install Kitware.CMake` |
+| C/C++ toolchain | Xcode CLT (`xcode-select --install`) | Visual Studio Build Tools with MSVC |
 
 > whisper.cpp is compiled from source automatically during `cargo build`.
 
@@ -140,11 +150,19 @@ cargo run --release
 
 ### Release
 
+On macOS:
+
 ```sh
 ./release.sh
 ```
 
-Builds the binary, creates a tar.gz, generates the Homebrew cask formula, and prints upload instructions.
+On Windows PowerShell:
+
+```powershell
+.\release-windows.ps1
+```
+
+Builds the release binary, packages `murmur.exe` into a zip, and prints upload instructions for the existing GitHub release tag.
 
 </details>
 
@@ -153,5 +171,4 @@ Builds the binary, creates a tar.gz, generates the Homebrew cask formula, and pr
 ## Roadmap
 
 - [ ] Live transcription (streaming partial results while recording)
-- [ ] Windows support (code is cross-platform ready, untested)
-
+- [ ] Native Windows installer / auto-start setup

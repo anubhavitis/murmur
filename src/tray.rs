@@ -177,7 +177,15 @@ impl Tray {
         let output_sub = Submenu::new("Output Mode", true);
         let is_clipboard = state.config.output_mode == OutputMode::Clipboard;
         let output_clipboard = CheckMenuItem::new("Copy to Clipboard", true, is_clipboard, None);
-        let output_paste = CheckMenuItem::new("Paste at Cursor", true, !is_clipboard, None);
+        let output_paste = CheckMenuItem::new(
+            format!(
+                "Paste at Cursor ({})",
+                crate::platform::PASTE_SHORTCUT_LABEL
+            ),
+            true,
+            !is_clipboard,
+            None,
+        );
         let output_clipboard_id = output_clipboard.id().clone();
         let output_paste_id = output_paste.id().clone();
         output_sub.append(&output_clipboard).unwrap();
@@ -186,7 +194,8 @@ impl Tray {
 
         let hotkey_sub = Submenu::new("Hotkey", true);
         let is_right_alt = state.config.hotkey == HotkeyChoice::RightAlt;
-        let hotkey_right_alt = CheckMenuItem::new("Right Option", true, is_right_alt, None);
+        let hotkey_right_alt =
+            CheckMenuItem::new(crate::platform::HOTKEY_LABEL, true, is_right_alt, None);
         let hotkey_caps_lock = CheckMenuItem::new("Caps Lock", true, !is_right_alt, None);
         let hotkey_right_alt_id = hotkey_right_alt.id().clone();
         let hotkey_caps_lock_id = hotkey_caps_lock.id().clone();
@@ -343,9 +352,17 @@ impl Tray {
             return Some(AppEvent::Quit);
         }
         if *id == self.ids.website {
-            let _ = std::process::Command::new("open")
-                .arg("https://anubhavitis.github.io/murmur")
-                .spawn();
+            let url = "https://anubhavitis.github.io/murmur";
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open").arg(url).spawn();
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", "", url])
+                    .spawn();
+            }
             return None;
         }
         if *id == self.ids.output_clipboard {
